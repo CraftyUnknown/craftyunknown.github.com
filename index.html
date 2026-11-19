@@ -352,7 +352,7 @@ function confetti(){const f=$('cf'),x=f.getContext('2d'),W=f.width=innerWidth,H=
  const ps=Array.from({length:150},()=>({x:Math.random()*W,y:-Math.random()*H,v:3+Math.random()*4,a:Math.random()*6,s:5+Math.random()*6,c:`hsl(${Math.random()*360},80%,60%)`}));
  (function z(){x.clearRect(0,0,W,H);ps.forEach(p=>{p.y+=p.v;p.a+=.1;p.x+=Math.sin(p.a);x.fillStyle=p.c;x.fillRect(p.x,p.y,p.s,p.s*.6)});if(Date.now()-t0<4000)requestAnimationFrame(z);else f.hidden=true})()}
 let seen=0,shown='',np,want=new Set;
-const popup=(t,x='')=>{PU.innerHTML=t+x+'<br><button onclick="rm()">Rematch</button><button onclick="PU.hidden=1">Close</button>';PU.hidden=false};
+const popup=(t,x='')=>{PU.innerHTML=t+x+'<br><button onclick="rm()">Rematch</button><button onclick="leave();P.hidden=1">Close</button>';PU.hidden=false};
 const ask=l=>{if(shown)popup(shown,l.includes(me)?'<p>Waiting for opponent...</p>':l.length?'<p>Opponent wants a rematch</p>':'')};
 const toast=t=>{const d=document.createElement('div');d.textContent=t;$('ts').append(d);setTimeout(()=>d.remove(),3500)};
 const draw=()=>{if(!S)return;R(0,0,600,600,'#111');c.lineWidth=1;g.draw(S,me);
