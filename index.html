@@ -21,6 +21,10 @@ button{cursor:pointer}
 #clock{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;font:14vw monospace}
 #an{width:min(50vh,70vw)}
 #aw{position:fixed;bottom:16px;width:100%;text-align:center;color:#888}
+#sv{margin-left:20px;cursor:pointer}
+#sv:before{content:'';display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:#db3}
+#sv[data-s=g]:before{background:#4c4}
+#sv[data-s=r]:before{background:#e44}
 #p{position:fixed;inset:0;z-index:2;background:#111;overflow:auto;text-align:center;padding-top:56px}
 #cv{display:none;position:fixed;inset:0;margin:auto;z-index:1;width:min(100vw,100vh);height:min(100vw,100vh);touch-action:none}
 </style></head><body>
@@ -28,7 +32,7 @@ button{cursor:pointer}
 <div id="clock"><svg id="an" viewBox="-50 -50 100 100" stroke="#eee" stroke-linecap="round">
 <circle r="47" fill="none" stroke-width="1"/><g id="nm" stroke="none" fill="#eee" font-size="7" text-anchor="middle" dominant-baseline="central"></g>
 <line id="hh" y2="-22" stroke-width="3"/><line id="mm" y2="-32" stroke-width="2"/><line id="ss" y2="-36" stroke="#888" stroke-width="1"/></svg><div id="dg"></div></div>
-<label id="aw"><input type="checkbox" id="wl" checked> Keep screen awake</label>
+<div id="aw"><label><input type="checkbox" id="wl" checked> Keep screen awake</label><span id="sv" onclick="svc()" title="Click to re-check"></span></div>
 <div id="p" hidden></div>
 <div id="pop" hidden></div>
 <div id="ts"></div>
@@ -481,7 +485,11 @@ function lob(){const n=conns.length+1;show(`<h2>${g.n}</h2><p>Lobby code</p><h1>
 const ICE={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},{urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},{urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}]}};
 // signaling servers tried in order (default = PeerJS cloud). Add your own, e.g. {host:'my-peer.onrender.com',port:443,secure:true,path:'/'}
 const SV=window.PEERS||[{host:'craftyunknown-peer.onrender.com',port:443,secure:true,path:'/'},{},{host:'peerjs.92k.de',port:443,secure:true,path:'/'}];
-if(SV[0].host)fetch('https://'+SV[0].host+'/',{mode:'no-cors'}).catch(()=>{}); // wake a sleeping free-tier server
+// multiplayer server status: green = a signaling server is reachable, red = none, yellow = checking (also wakes a sleeping free-tier server)
+async function svc(){const el=$('sv');el.dataset.s='c';el.textContent='Multiplayer: checking...';
+ const ok=await Promise.any(SV.map(v=>{const a=new AbortController(),t=setTimeout(()=>a.abort(),8000);return fetch('https://'+(v.host||'0.peerjs.com')+'/',{mode:'no-cors',signal:a.signal,cache:'no-store'}).then(()=>1).finally(()=>clearTimeout(t))})).catch(()=>0);
+ el.dataset.s=ok?'g':'r';el.textContent='Multiplayer: '+(ok?'online':'offline')}
+svc();setInterval(svc,60000);
 const mkp=(i,id)=>new Peer(id,{...ICE,...SV[i]});
 const NET='Could not reach the multiplayer server. Check your connection (or disable ad/tracker blockers) and try again.';
 const bad=e=>['network','server-error','socket-error','socket-closed','disconnected'].includes(e.type);
