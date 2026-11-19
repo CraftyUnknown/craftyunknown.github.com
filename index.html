@@ -18,8 +18,8 @@ button{cursor:pointer}
 </style></head><body>
 <button id="m" onclick="menu()">☰</button>
 <div id="clock"><svg id="an" viewBox="-50 -50 100 100" stroke="#eee" stroke-linecap="round">
-<circle r="47" fill="none" stroke-width="1"/><circle r="43" fill="none" stroke-width="4" stroke-dasharray="1 22.04" stroke-dashoffset="9.5"/>
-<line id="hh" y2="-24" stroke-width="3"/><line id="mm" y2="-35" stroke-width="2"/><line id="ss" y2="-40" stroke="#888" stroke-width="1"/></svg><div id="dg"></div></div>
+<circle r="47" fill="none" stroke-width="1"/><g id="nm" stroke="none" fill="#eee" font-size="7" text-anchor="middle" dominant-baseline="central"></g>
+<line id="hh" y2="-22" stroke-width="3"/><line id="mm" y2="-32" stroke-width="2"/><line id="ss" y2="-36" stroke="#888" stroke-width="1"/></svg><div id="dg"></div></div>
 <label id="aw"><input type="checkbox" id="wl" checked> Keep screen awake</label>
 <div id="p" hidden></div>
 <div id="pop" hidden></div>
@@ -30,6 +30,7 @@ button{cursor:pointer}
 const $=i=>document.getElementById(i),P=$('p'),PU=$('pop'),cv=$('cv'),c=cv.getContext('2d');
 
 // clock + wake lock
+for(let i=1;i<13;i++)$('nm').innerHTML+=`<text x="${(39*Math.sin(i*Math.PI/6)).toFixed(1)}" y="${(-39*Math.cos(i*Math.PI/6)).toFixed(1)}">${i}</text>`;
 const hands=[['hh',d=>d.getHours()%12*30+d.getMinutes()/2],['mm',d=>d.getMinutes()*6],['ss',d=>d.getSeconds()*6]];
 const tick=()=>{const d=new Date();$('dg').textContent=d.toLocaleTimeString([],{hour12:false});hands.forEach(([i,f])=>$(i).setAttribute('transform','rotate('+f(d)+')'))};
 tick();setInterval(tick,250);
