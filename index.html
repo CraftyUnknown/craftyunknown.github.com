@@ -4,6 +4,7 @@
 <title>Clock</title>
 <style>
 html,body{margin:0;height:100%;background:#111;color:#eee;font:16px sans-serif;overflow:hidden}
+textarea{width:90%;max-width:480px;height:90px;background:#222;color:#eee;border:1px solid #555;font:11px monospace;margin:6px}
 button,input{font:inherit;background:#222;color:#eee;border:1px solid #555;padding:8px 14px;margin:4px}
 button{cursor:pointer}
 [hidden]{display:none!important}
@@ -477,11 +478,11 @@ const solo=()=>S&&!cn&&!conns.length;
 function pause(){if(!solo()||S.w!=null)return;if(paused)return resume();paused=1;clearInterval(iv);PU.innerHTML='Paused<br><button onclick="resume()">Resume</button><button onclick="leave();P.hidden=1">Close</button>';PU.hidden=false}
 function resume(){paused=0;PU.hidden=true;loop()}
 (function f(n){DT=Math.min(.05,(n-LT)/1000);LT=n;if(S&&cv.style.display=='block')draw();requestAnimationFrame(f)})(0);
-function leave(){clearInterval(iv);paused=0;$('pz').hidden=true;const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;seen=0;$('ts').innerHTML='';shown='';want=new Set;PU.hidden=true;cv.style.display='none';$('clock').hidden=$('aw').hidden=false}
-function menu(){leave();show('<h2>Games</h2>'+Object.values(G).map(v=>`<button onclick="pick('${v.k}')">${v.n}</button>`).join('<br>')+'<h3>Join a lobby</h3><input id=cd placeholder=CODE maxlength=4 size=6><button onclick=join()>Join</button><br><br><button onclick="P.hidden=1">Close</button>')}
+function leave(){clearInterval(iv);direct=0;pcs.forEach(x=>x.close());pcs=[];pend=null;paused=0;$('pz').hidden=true;const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;seen=0;$('ts').innerHTML='';shown='';want=new Set;PU.hidden=true;cv.style.display='none';$('clock').hidden=$('aw').hidden=false}
+function menu(){leave();show('<h2>Games</h2>'+Object.values(G).map(v=>`<button onclick="pick('${v.k}')">${v.n}</button>`).join('<br>')+'<h3>Join a lobby</h3><input id=cd placeholder=CODE maxlength=4 size=6><button onclick=join()>Join</button><br><button onclick=joinM()>Join without server</button><br><br><button onclick="P.hidden=1">Close</button>')}
 function pick(k){g=G[k];show(`<h2>${g.n}</h2><h3>How to play</h3><p class=hw>${g.how}</p><button onclick=opts()>Got it</button><br><br><button onclick=menu()>Back</button>`)}
-function opts(){show(`<h2>${g.n}</h2>`+(g.min<2?'<button onclick=go(1)>Solo</button><br>':'')+(g.ai?'<button onclick=go(2,1)>Play vs AI</button><br>':'')+'<button onclick=host()>Create lobby</button><br><br><button onclick=menu()>Back</button>')}
-function lob(){const n=conns.length+1;show(`<h2>${g.n}</h2><p>Lobby code</p><h1>${code}</h1><p>Players: ${n}</p>`+(n>=g.min?'<button onclick="go(conns.length+1)">Start</button>':'<p>Waiting for players...</p>')+'<br><button onclick=menu()>Leave</button>');conns.forEach(c=>c.send({l:n}))}
+function opts(){show(`<h2>${g.n}</h2>`+(g.min<2?'<button onclick=go(1)>Solo</button><br>':'')+(g.ai?'<button onclick=go(2,1)>Play vs AI</button><br>':'')+'<button onclick=host()>Create lobby</button><br><button onclick=hostM()>Create lobby without server</button><br><br><button onclick=menu()>Back</button>')}
+function lob(){const n=conns.length+1;show(`<h2>${g.n}</h2><p>${direct?'Direct lobby (no server)':'Lobby code'}</p><h1>${direct?'':code}</h1><p>Players: ${n}</p>`+(n>=g.min?'<button onclick="go(conns.length+1)">Start</button>':'<p>Waiting for players...</p>')+(direct?'<br><button onclick=addP()>Add player</button>':'')+'<br><button onclick=menu()>Leave</button>');conns.forEach(c=>c.send({l:n}))}
 const ICE={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},{urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},{urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}]}};
 // signaling servers tried in order (default = PeerJS cloud). Add your own, e.g. {host:'my-peer.onrender.com',port:443,secure:true,path:'/'}
 const SV=window.PEERS||[{host:'craftyunknown-peer.onrender.com',port:443,secure:true,path:'/'},{},{host:'peerjs.92k.de',port:443,secure:true,path:'/'}];
@@ -499,7 +500,7 @@ async function svc(){if(busy)return;busy=1;const el=$('sv');el.dataset.s='c';el.
   if(b){el.dataset.s='g';el.textContent='Multiplayer: online ('+b.ws+' ms)'}else if(LR.length==SV.length){el.dataset.s='r';el.textContent='Multiplayer: '+(LR.some(r=>r.http)?'blocked (WebSocket)':'offline')}
   el.title=LR.map(r=>r.h+': https '+(r.http?r.http+' ms':'fail')+', websocket '+(r.ws?r.ws+' ms':'fail')).join('\n')};
  await Promise.all(SV.map(async(v,i)=>{LR.push(await probe(v,i));upd()}));clearTimeout(w);busy=0}
-async function fail(t){show('<h2>Cannot reach multiplayer server</h2><p class=hw>'+NET+'</p><p id=dgn class=hw>Running connection test...</p><button onclick=menu()>Back</button>');
+async function fail(t){show('<h2>Cannot reach multiplayer server</h2><p class=hw>'+NET+'</p><p id=dgn class=hw>Running connection test...</p><p class=hw>No server needed: you can connect directly by swapping two codes.</p>'+(g?'<button onclick=hostM()>Create lobby without server</button>':'')+'<button onclick=joinM()>Join without server</button><br><br><button onclick=menu()>Back</button>');
  const R=await Promise.all(SV.map(probe)),h=R.some(r=>r.http);
  if($('dgn'))$('dgn').textContent=R.map(r=>(r.ws?'OK  ':r.http?'WebSocket blocked  ':'Unreachable  ')+r.h).join('\n')+'\nError: '+t+'\n\n'+(R.some(r=>r.ws)?'A server is reachable, try again.':h?'This network or browser allows the website but blocks WebSockets. Try turning off VPN, ad blockers or other extensions, or use a different network.':'No server could be reached. Check your internet connection, VPN, firewall or DNS.')}
 svc();setInterval(svc,60000);
@@ -510,18 +511,38 @@ function host(n=0,i=0){const k=g;leave();g=k;show('<h2>Creating lobby...</h2><bu
  p.on('error',e=>{if(peer!=p)return;if(e.type=='unavailable-id')host(n,i);else if(bad(e)&&i<SV.length-1)host(n,i+1);else if(bad(e)&&n<2)setTimeout(()=>{if(peer==p)host(n+1,0)},1200);else fail(e.type)});
  p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
  p.on('open',lob);
- p.on('connection',c=>{
-  c.on('open',()=>{if(started||conns.length>=g.max-1)return c.close();conns.push(c);lob()});
-  c.on('data',m=>m.rm?rem(conns.indexOf(c)+1):S&&g.act(S,conns.indexOf(c)+1,m));
-  c.on('close',()=>{if(peer==p&&!started){conns=conns.filter(x=>x!=c);lob()}})})}
+ p.on('connection',c=>acc(c,p))}
+function acc(c,p){c.on('open',()=>{if(started||conns.length>=g.max-1)return c.close();conns.push(c);lob()});
+ c.on('data',m=>m.rm?rem(conns.indexOf(c)+1):S&&g.act(S,conns.indexOf(c)+1,m));
+ c.on('close',()=>{if(peer==p&&!started){conns=conns.filter(x=>x!=c);lob()}})}
+function cli(c,p){c.on('open',()=>show(`<h2>Lobby ${code}</h2><p id=n>Connected</p><button onclick=menu()>Leave</button>`));
+ c.on('data',m=>{if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.rq)ask(m.rq);if(m.rs){rst();shown='';PU.hidden=true}if(m.s)S=m.s});
+ c.on('close',()=>{if(peer==p){alert('Disconnected');menu()}})}
 function join(n=0,cd,i=0){code=cd||$('cd').value.trim().toUpperCase();leave();show('<h2>Connecting...</h2><button onclick=menu()>Cancel</button>');const p=peer=mkp(i);
  setTimeout(()=>{if(peer==p&&!started&&!$('n')){alert('Could not connect to that lobby. Check the code and try again.');menu()}},20000);
  p.on('error',e=>{if(peer!=p)return;const nx=e.type=='peer-unavailable'||bad(e);if(nx&&i<SV.length-1)join(n,code,i+1);else if(bad(e)&&n<2)setTimeout(()=>{if(peer==p)join(n+1,code,0)},1200);else if(e.type=='peer-unavailable'){alert('Lobby not found');menu()}else fail(e.type)});
  p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
- p.on('open',()=>{const c=cn=p.connect('cuhub-'+code);
-  c.on('open',()=>show(`<h2>Lobby ${code}</h2><p id=n>Connected</p><button onclick=menu()>Leave</button>`));
-  c.on('data',m=>{if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.rq)ask(m.rq);if(m.rs){rst();shown='';PU.hidden=true}if(m.s)S=m.s});
-  c.on('close',()=>{if(peer==p){alert('Disconnected');menu()}})})}
+ p.on('open',()=>cli(cn=p.connect('cuhub-'+code),p))}
+// ---- direct (serverless) connect: players swap two codes by hand (chat/message), no signaling server needed ----
+let direct=0,pcs=[],pend=null;
+class DCc{constructor(dc){this.dc=dc;this.h={};dc.onopen=()=>this.h.open&&this.h.open();dc.onmessage=e=>this.h.data&&this.h.data(JSON.parse(e.data));dc.onclose=()=>this.h.close&&this.h.close();if(dc.readyState=='open')setTimeout(()=>this.h.open&&this.h.open())}
+ on(e,f){this.h[e]=f}send(m){this.dc.readyState=='open'&&this.dc.send(JSON.stringify(m))}close(){this.dc.close()}}
+const enc=async o=>{const j=JSON.stringify(o);let z='z',u;try{u=new Uint8Array(await new Response(new Blob([j]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer())}catch(e){z='r';u=new TextEncoder().encode(j)}return z+btoa(String.fromCharCode(...u)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
+const dec=async t=>{t=t.replace(/\s/g,'');const u=Uint8Array.from(atob(t.slice(1).replace(/-/g,'+').replace(/_/g,'/')),x=>x.charCodeAt(0));return JSON.parse(t[0]=='z'?await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text():new TextDecoder().decode(u))};
+const gathered=pc=>new Promise(res=>{const f=()=>{if(pc.iceGatheringState=='complete')res()};f();pc.addEventListener('icegatheringstatechange',f);setTimeout(res,4000)});
+const box=(id,ro)=>`<textarea id=${id} ${ro?'readonly onclick=this.select()':''}></textarea>`;
+const cp="<button onclick=\"navigator.clipboard.writeText($('oc').value)\">Copy</button>";
+function hostM(){const k=g;leave();g=k;direct=1;code='Direct';peer={destroy(){pcs.forEach(x=>x.close())}};lob()}
+async function addP(){if(conns.length+1>=g.max)return alert('Lobby is full');const pc=new RTCPeerConnection(ICE.config);pcs.push(pc);acc(new DCc(pc.createDataChannel('g')),peer);
+ show('<h2>Add a player</h2><p>Creating code...</p>');await pc.setLocalDescription(await pc.createOffer());await gathered(pc);const t=await enc({s:pc.localDescription.sdp});pend=pc;
+ show(`<h2>Add a player</h2><p class=hw>1. Send this code to the player (chat, message...).</p>${box('oc',1)}${cp}<p class=hw>2. Paste the reply code they send back.</p>${box('ac')}<br><button onclick=fnd()>Connect</button><button onclick=lob()>Cancel</button>`);$('oc').value=t}
+async function fnd(){try{const a=await dec($('ac').value),n0=conns.length;await pend.setRemoteDescription({type:'answer',sdp:a.s});show('<h2>Connecting...</h2>');
+ setTimeout(()=>{if(peer&&conns.length==n0&&!started&&P.textContent.includes('Connecting')){alert('Could not connect to that player. Try again.');lob()}},20000)}catch(e){alert('That reply code is not valid.')}}
+function joinM(){leave();direct=1;show(`<h2>Join without server</h2><p class=hw>Paste the code the host sent you.</p>${box('oc')}<br><button onclick=jgo()>Continue</button><button onclick=menu()>Back</button>`)}
+async function jgo(){let o;try{o=await dec($('oc').value)}catch(e){return alert('That code is not valid.')}
+ const pc=new RTCPeerConnection(ICE.config),p=peer={destroy(){pc.close()}};code='Direct';pcs.push(pc);pc.ondatachannel=e=>cli(cn=new DCc(e.channel),p);
+ show('<h2>Connecting...</h2><p>Creating reply code...</p>');await pc.setRemoteDescription({type:'offer',sdp:o.s});await pc.setLocalDescription(await pc.createAnswer());await gathered(pc);const t=await enc({s:pc.localDescription.sdp});
+ show(`<h2>Reply code</h2><p class=hw>Send this code back to the host, then wait for them to connect.</p>${box('oc',1)}${cp}<br><button onclick=menu()>Cancel</button>`);$('oc').value=t}
 function go(n,b){started=1;bot=b;np=n;S=g.init(n,b);me=0;conns.forEach((c,i)=>c.send({g:g.k,me:i+1}));begin()}
 function begin(){rst();seen=0;P.hidden=true;cv.style.display='block';$('clock').hidden=$('aw').hidden=true;$('pz').hidden=!solo();if(!cn)loop()}
 function loop(){iv=setInterval(()=>{if(bot){const a=S.u??S.t;if(g.mv)g.ai(S);else if(a!=1)bt=0;else if((bt+=1/30)>.9){bt=0;g.ai(S)}}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}))},33)}
