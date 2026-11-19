@@ -200,12 +200,12 @@ chess:{n:'Chess',min:2,max:2,tie:1,
   T(msg(s,me)+(me?' (black)':' (white)'),300,590,20)}},
 
 cards:{n:'Crazy Cards',min:2,max:4,
- init:n=>{const s={h:Array.from({length:n},()=>Array.from({length:7},dr)),u:0,d:1,w:null,pk:0};do s.t=dr();while(s.t[0]=='k');s.c=s.t[0];s.pl=[[s.t,0]];return s},
+ init:n=>{const s={h:Array.from({length:n},()=>Array.from({length:7},dr)),u:0,d:1,w:null,pk:0};do s.t=dr();while(s.t[0]=='k');s.c=s.t[0];s.pl=[[s.t,0,-1]];return s},
  act(s,p,m){if(m.d!==1||m.x==null||s.w!=null||p!=s.u)return;const x=m.x*600,y=m.y*600,h=s.h[p];
   if(s.pk){const i=Math.floor((x-130)/90);if(y>270&&y<320&&i>=0&&i<4){s.c='rygb'[i];s.pk=0;lg(s,p,'% chose '+['red','yellow','green','blue'][i]);nx(s)}return}
   if(x>170&&x<230&&y>140&&y<224){h.push(dr());lg(s,p,'% drew a card');nx(s);return}
   const[st,x0]=hx(h.length),i=y>=400&&y<=530&&x>=x0&&x<=x0+(h.length-1)*st+70?st?Math.min(h.length-1,Math.floor((x-x0)/st)):0:-1,q=h[i];if(!q||!ok(s,q))return;
-  h.splice(i,1);s.t=q;s.pl.push([q,(Math.random()-.5)*.7]);if(s.pl.length>6)s.pl.shift();lg(s,p,'% played '+nm(q));
+  h.splice(i,1);s.t=q;s.pl.push([q,(Math.random()-.5)*.7,p]);if(s.pl.length>6)s.pl.shift();lg(s,p,'% played '+nm(q));
   if(!h.length){s.w=p;return}if(h.length==1)lg(s,p,'% has one card left!');if(q[0]=='k'){s.pk=1;return}
   s.c=q[0];const v=q[1],n=s.h.length,vi=((s.u+s.d)%n+n)%n;
   if(v=='S'){lg(s,vi,'Skip! (%)');nx(s,2)}else if(v=='+'){s.h[vi].push(dr(),dr());lg(s,vi,'Draw 2! (%)');nx(s,2)}else if(v=='R'){s.d*=-1;lg(s,-1,'Direction reversed');nx(s,n==2?2:1)}else nx(s)},
@@ -213,9 +213,9 @@ cards:{n:'Crazy Cards',min:2,max:4,
   if(s.pk){const n=[...'rygb'].map(k=>h.filter(q=>q[0]==k).length);return this.act(s,1,ck(170+n.indexOf(Math.max(...n))*90,295))}
   let i=h.findIndex(q=>q[0]!='k'&&ok(s,q));if(i<0)i=h.findIndex(q=>ok(s,q));
   const[st,x0]=hx(h.length);this.act(s,1,i<0?ck(200,180):ck(x0+i*st+(st?st/2:35),470))},
- draw(s,me){s.h.forEach((h,i)=>T((s.u==i?'> ':'')+(i==me?'You':'P'+(i+1))+': '+h.length,75+i*150,30,20));
+ draw(s,me){s.h.forEach((h,i)=>{T((s.u==i?'> ':'')+(i==me?'You':'P'+(i+1))+': '+h.length,75+i*150,30,20);if(i!=me){const a=chg('oc'+i,[h.length]);if(a[0].t<450&&h.length>a[0].o){const e=ez(a[0].t/450),x=200+(75+i*150-200)*e,y=182+(60-182)*e;R(x-15,y-21,30,42,'#ddd');R(x-13,y-19,26,38,'#444')}}});
   for(let i=0;i<3;i++){R(170+i*2,140-i*2,60,84,'#ddd');R(172+i*2,142-i*2,56,80,'#444')}T('DRAW',201,182,14);
-  s.pl.forEach(([q,a],k)=>{const p=tw('pl'+a,300,182,300,520);c.save();c.translate(p.x,p.y);c.rotate(a);card(-30,-42,k==s.pl.length-1&&q[0]=='k'?s.c+q[1]:q,60);c.restore()});
+  s.pl.forEach(([q,a,pp],k)=>{const p=pp==me?tw('pl'+a,300,182,300,520):pp>=0?tw('pl'+a,300,182,75+pp*150,-60):tw('pl'+a,300,182,200,182);c.save();c.translate(p.x,p.y);c.rotate(a);card(-30,-42,k==s.pl.length-1&&q[0]=='k'?s.c+q[1]:q,60);c.restore()});
   if(s.pk&&s.u==me){T('Pick a color',300,250,20);[...'rygb'].forEach((k,i)=>R(130+i*90,270,80,50,CC[k]))}
   else T(s.u==me?'Your turn':'',300,290,20);
   const h=s.h[me],[st,x0]=hx(h.length),cn2={};h.forEach((q,i)=>{const o=cn2[q]=(cn2[q]??-1)+1,p=tw('h'+q+o,x0+i*st,s.u==me&&s.w==null&&ok(s,q)?415:430,200,182);card(p.x,p.y,q,70)})}},
