@@ -486,9 +486,11 @@ const ICE={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun
 // signaling servers tried in order (default = PeerJS cloud). Add your own, e.g. {host:'my-peer.onrender.com',port:443,secure:true,path:'/'}
 const SV=window.PEERS||[{host:'craftyunknown-peer.onrender.com',port:443,secure:true,path:'/'},{},{host:'peerjs.92k.de',port:443,secure:true,path:'/'}];
 // multiplayer server status: green = a signaling server is reachable, red = none, yellow = checking (also wakes a sleeping free-tier server)
-async function svc(){const el=$('sv');el.dataset.s='c';el.textContent='Multiplayer: checking...';
- const ok=await Promise.any(SV.map(v=>{const a=new AbortController(),t=setTimeout(()=>a.abort(),8000);return fetch('https://'+(v.host||'0.peerjs.com')+'/',{mode:'no-cors',signal:a.signal,cache:'no-store'}).then(()=>1).finally(()=>clearTimeout(t))})).catch(()=>0);
- el.dataset.s=ok?'g':'r';el.textContent='Multiplayer: '+(ok?'online':'offline')}
+let busy=0;
+async function svc(){if(busy)return;busy=1;const el=$('sv'),t0=performance.now();el.dataset.s='c';el.textContent='Multiplayer: pinging...';
+ const w=setTimeout(()=>{if(busy)el.textContent='Multiplayer: starting server...'},2500);
+ const ok=await Promise.any(SV.map((v,i)=>{const a=new AbortController(),t=setTimeout(()=>a.abort(),i==0&&v.host?60000:8000);return fetch('https://'+(v.host||'0.peerjs.com')+'/',{mode:'no-cors',signal:a.signal,cache:'no-store'}).then(()=>performance.now()-t0).finally(()=>clearTimeout(t))})).catch(()=>0);
+ clearTimeout(w);busy=0;el.dataset.s=ok?'g':'r';el.textContent='Multiplayer: '+(ok?'online ('+Math.round(ok)+' ms)':'offline')}
 svc();setInterval(svc,60000);
 const mkp=(i,id)=>new Peer(id,{...ICE,...SV[i]});
 const NET='Could not reach the multiplayer server. Check your connection (or disable ad/tracker blockers) and try again.';
