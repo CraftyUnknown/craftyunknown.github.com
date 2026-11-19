@@ -479,19 +479,22 @@ function pick(k){g=G[k];show(`<h2>${g.n}</h2><h3>How to play</h3><p class=hw>${g
 function opts(){show(`<h2>${g.n}</h2>`+(g.min<2?'<button onclick=go(1)>Solo</button><br>':'')+(g.ai?'<button onclick=go(2,1)>Play vs AI</button><br>':'')+'<button onclick=host()>Create lobby</button><br><br><button onclick=menu()>Back</button>')}
 function lob(){const n=conns.length+1;show(`<h2>${g.n}</h2><p>Lobby code</p><h1>${code}</h1><p>Players: ${n}</p>`+(n>=g.min?'<button onclick="go(conns.length+1)">Start</button>':'<p>Waiting for players...</p>')+'<br><button onclick=menu()>Leave</button>');conns.forEach(c=>c.send({l:n}))}
 const ICE={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},{urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},{urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}]}};
+// signaling servers tried in order (default = PeerJS cloud). Add your own, e.g. {host:'my-peer.onrender.com',port:443,secure:true,path:'/'}
+const SV=window.PEERS||[{},{host:'peerjs.92k.de',port:443,secure:true,path:'/'}];
+const mkp=(i,id)=>new Peer(id,{...ICE,...SV[i]});
 const NET='Could not reach the multiplayer server. Check your connection (or disable ad/tracker blockers) and try again.';
 const bad=e=>['network','server-error','socket-error','socket-closed','disconnected'].includes(e.type);
-function host(n=0){const k=g;leave();g=k;show('<h2>Creating lobby...</h2><button onclick=menu()>Cancel</button>');code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const p=peer=new Peer('cuhub-'+code,ICE);
- p.on('error',e=>{if(peer!=p)return;if(e.type=='unavailable-id')host(n);else if(bad(e)&&n<3)setTimeout(()=>{if(peer==p)host(n+1)},1200);else{alert(e.type+': '+NET);menu()}});
+function host(n=0,i=0){const k=g;leave();g=k;show('<h2>Creating lobby...</h2><button onclick=menu()>Cancel</button>');code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const p=peer=mkp(i,'cuhub-'+code);
+ p.on('error',e=>{if(peer!=p)return;if(e.type=='unavailable-id')host(n,i);else if(bad(e)&&i<SV.length-1)host(n,i+1);else if(bad(e)&&n<2)setTimeout(()=>{if(peer==p)host(n+1,0)},1200);else{alert(e.type+': '+NET);menu()}});
  p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
  p.on('open',lob);
  p.on('connection',c=>{
   c.on('open',()=>{if(started||conns.length>=g.max-1)return c.close();conns.push(c);lob()});
   c.on('data',m=>m.rm?rem(conns.indexOf(c)+1):S&&g.act(S,conns.indexOf(c)+1,m));
   c.on('close',()=>{if(peer==p&&!started){conns=conns.filter(x=>x!=c);lob()}})})}
-function join(n=0,cd){code=cd||$('cd').value.trim().toUpperCase();leave();show('<h2>Connecting...</h2><button onclick=menu()>Cancel</button>');const p=peer=new Peer(ICE);
+function join(n=0,cd,i=0){code=cd||$('cd').value.trim().toUpperCase();leave();show('<h2>Connecting...</h2><button onclick=menu()>Cancel</button>');const p=peer=mkp(i);
  setTimeout(()=>{if(peer==p&&!started&&!$('n')){alert('Could not connect to that lobby. Check the code and try again.');menu()}},20000);
- p.on('error',e=>{if(peer!=p)return;if(e.type=='peer-unavailable'){alert('Lobby not found');menu()}else if(bad(e)&&n<3)setTimeout(()=>{if(peer==p)join(n+1,code)},1200);else{alert(e.type+': '+NET);menu()}});
+ p.on('error',e=>{if(peer!=p)return;const nx=e.type=='peer-unavailable'||bad(e);if(nx&&i<SV.length-1)join(n,code,i+1);else if(bad(e)&&n<2)setTimeout(()=>{if(peer==p)join(n+1,code,0)},1200);else if(e.type=='peer-unavailable'){alert('Lobby not found');menu()}else{alert(e.type+': '+NET);menu()}});
  p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
  p.on('open',()=>{const c=cn=p.connect('cuhub-'+code);
   c.on('open',()=>show(`<h2>Lobby ${code}</h2><p id=n>Connected</p><button onclick=menu()>Leave</button>`));
