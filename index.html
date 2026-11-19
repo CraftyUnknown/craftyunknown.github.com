@@ -488,6 +488,8 @@ const ICE={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun
 const SV=window.PEERS||[{host:'craftyunknown-peer.onrender.com',port:443,secure:true,path:'/'},{},{host:'peerjs.92k.de',port:443,secure:true,path:'/'}];
 // multiplayer server status: green = a signaling server is reachable, red = none, yellow = checking (also wakes a sleeping free-tier server)
 let busy=0,LR=[];
+const NT=window.NTFY||'https://ntfy.sh/'; // backup rendezvous over plain HTTPS (works where WebSockets are blocked)
+const pn=async()=>{const t0=performance.now();try{await fetch(NT+'v1/health',{cache:'no-store',signal:AbortSignal.timeout(8000)});const m=Math.round(performance.now()-t0);return{h:'ntfy.sh (backup)',http:m,ws:m}}catch(e){return{h:'ntfy.sh (backup)',http:0,ws:0}}};
 // probe a signaling server: plain HTTPS reachability and a real WebSocket (what PeerJS needs)
 const probe=(v,i)=>{const h=v.host||'0.peerjs.com',t0=performance.now(),to=i==0&&v.host?60000:8000,rnd=()=>Math.random().toString(36).slice(2);
  const http=fetch('https://'+h+'/',{mode:'no-cors',cache:'no-store',signal:AbortSignal.timeout(to)}).then(()=>Math.round(performance.now()-t0),()=>0);
@@ -497,18 +499,18 @@ const probe=(v,i)=>{const h=v.host||'0.peerjs.com',t0=performance.now(),to=i==0&
 async function svc(){if(busy)return;busy=1;const el=$('sv');el.dataset.s='c';el.textContent='Multiplayer: pinging...';LR=[];
  const w=setTimeout(()=>{if(el.dataset.s=='c')el.textContent='Multiplayer: starting server...'},2500);
  const upd=()=>{const b=LR.filter(r=>r.ws).sort((a,b)=>a.ws-b.ws)[0];
-  if(b){el.dataset.s='g';el.textContent='Multiplayer: online ('+b.ws+' ms)'}else if(LR.length==SV.length){el.dataset.s='r';el.textContent='Multiplayer: '+(LR.some(r=>r.http)?'blocked (WebSocket)':'offline')}
+  if(b){el.dataset.s='g';el.textContent='Multiplayer: online ('+b.ws+' ms)'}else if(LR.length==SV.length+1){el.dataset.s='r';el.textContent='Multiplayer: '+(LR.some(r=>r.http)?'blocked (WebSocket)':'offline')}
   el.title=LR.map(r=>r.h+': https '+(r.http?r.http+' ms':'fail')+', websocket '+(r.ws?r.ws+' ms':'fail')).join('\n')};
- await Promise.all(SV.map(async(v,i)=>{LR.push(await probe(v,i));upd()}));clearTimeout(w);busy=0}
+ await Promise.all([...SV.map(probe),pn()].map(async x=>{LR.push(await x);upd()}));clearTimeout(w);busy=0}
 async function fail(t){show('<h2>Cannot reach multiplayer server</h2><p class=hw>'+NET+'</p><p id=dgn class=hw>Running connection test...</p><p class=hw>No server needed: you can connect directly by swapping two codes.</p>'+(g?'<button onclick=hostM()>Create lobby without server</button>':'')+'<button onclick=joinM()>Join without server</button><br><br><button onclick=menu()>Back</button>');
- const R=await Promise.all(SV.map(probe)),h=R.some(r=>r.http);
+ const R=await Promise.all([...SV.map(probe),pn()]),h=R.some(r=>r.http);
  if($('dgn'))$('dgn').textContent=R.map(r=>(r.ws?'OK  ':r.http?'WebSocket blocked  ':'Unreachable  ')+r.h).join('\n')+'\nError: '+t+'\n\n'+(R.some(r=>r.ws)?'A server is reachable, try again.':h?'This network or browser allows the website but blocks WebSockets. Try turning off VPN, ad blockers or other extensions, or use a different network.':'No server could be reached. Check your internet connection, VPN, firewall or DNS.')}
 svc();setInterval(svc,60000);
 const mkp=(i,id)=>new Peer(id,{...ICE,...SV[i]});
 const NET='Could not reach the multiplayer server. Check your connection (or disable ad/tracker blockers) and try again.';
 const bad=e=>['network','server-error','socket-error','socket-closed','disconnected'].includes(e.type);
 function host(n=0,i=0){const k=g;leave();g=k;show('<h2>Creating lobby...</h2><button onclick=menu()>Cancel</button>');code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const p=peer=mkp(i,'cuhub-'+code);
- p.on('error',e=>{if(peer!=p)return;if(e.type=='unavailable-id')host(n,i);else if(bad(e)&&i<SV.length-1)host(n,i+1);else if(bad(e)&&n<2)setTimeout(()=>{if(peer==p)host(n+1,0)},1200);else fail(e.type)});
+ p.on('error',e=>{if(peer!=p)return;if(e.type=='unavailable-id')host(n,i);else if(bad(e)&&i<SV.length-1)host(n,i+1);else if(bad(e)&&n<1)setTimeout(()=>{if(peer==p)host(n+1,0)},1200);else hostN()});
  p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
  p.on('open',lob);
  p.on('connection',c=>acc(c,p))}
@@ -520,9 +522,26 @@ function cli(c,p){c.on('open',()=>show(`<h2>Lobby ${code}</h2><p id=n>Connected<
  c.on('close',()=>{if(peer==p){alert('Disconnected');menu()}})}
 function join(n=0,cd,i=0){code=cd||$('cd').value.trim().toUpperCase();leave();show('<h2>Connecting...</h2><button onclick=menu()>Cancel</button>');const p=peer=mkp(i);
  setTimeout(()=>{if(peer==p&&!started&&!$('n')){alert('Could not connect to that lobby. Check the code and try again.');menu()}},20000);
- p.on('error',e=>{if(peer!=p)return;const nx=e.type=='peer-unavailable'||bad(e);if(nx&&i<SV.length-1)join(n,code,i+1);else if(bad(e)&&n<2)setTimeout(()=>{if(peer==p)join(n+1,code,0)},1200);else if(e.type=='peer-unavailable'){alert('Lobby not found');menu()}else fail(e.type)});
+ p.on('error',e=>{if(peer!=p)return;const nx=e.type=='peer-unavailable'||bad(e);if(nx&&i<SV.length-1)join(n,code,i+1);else if(bad(e)&&n<1)setTimeout(()=>{if(peer==p)join(n+1,code,0)},1200);else joinN(code)});
  p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
  p.on('open',()=>cli(cn=p.connect('cuhub-'+code),p))}
+// ---- backup signaling over ntfy.sh (HTTPS only): same 4-letter codes, used automatically when PeerJS servers are unreachable ----
+const npub=(t,o)=>fetch(NT+t,{method:'POST',body:JSON.stringify(o)}).catch(()=>{});
+async function nsub(t,fn,ab){const seen=new Set();while(!ab.signal.aborted){try{const r=await fetch(NT+t+'/json?since='+(Math.floor(Date.now()/1000)-5),{signal:ab.signal}),rd=r.body.getReader(),d=new TextDecoder();let b='';
+  for(;;){const{done,value}=await rd.read();if(done)break;b+=d.decode(value,{stream:true});let i;while((i=b.indexOf('\n'))>=0){const l=b.slice(0,i);b=b.slice(i+1);try{const e=JSON.parse(l);if(e.event=='message'&&!seen.has(e.id)){seen.add(e.id);fn(JSON.parse(e.message))}}catch(x){}}}}catch(e){if(ab.signal.aborted)return}await new Promise(r=>setTimeout(r,1500))}}
+const nok=()=>fetch(NT+'v1/health',{signal:AbortSignal.timeout(8000)});
+async function hostN(){const k=g;leave();g=k;show('<h2>Creating lobby...</h2><button onclick=menu()>Cancel</button>');
+ code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const T='cuhub-'+code,ab=new AbortController(),w={},p=peer={destroy(){ab.abort();pcs.forEach(x=>x.close())}};
+ try{await nok()}catch(e){return fail('no server reachable')}
+ nsub(T,async m=>{if(m.t=='join'&&!started&&conns.length+1<g.max&&!w[m.id]){const pc=w[m.id]=new RTCPeerConnection(ICE.config);pcs.push(pc);acc(new DCc(pc.createDataChannel('g')),p);await pc.setLocalDescription(await pc.createOffer());await gathered(pc);npub(T,{t:'offer',to:m.id,s:pc.localDescription.sdp})}
+  else if(m.t=='answer'&&w[m.from]&&!w[m.from].remoteDescription)w[m.from].setRemoteDescription({type:'answer',sdp:m.s})},ab);
+ lob()}
+async function joinN(cd){code=cd;leave();show('<h2>Connecting...</h2><button onclick=menu()>Cancel</button>');
+ try{await nok()}catch(e){return fail('no server reachable')}
+ const T='cuhub-'+code,id=Math.random().toString(36).slice(2),ab=new AbortController();let pc;const p=peer={destroy(){ab.abort();pc&&pc.close()}};
+ setTimeout(()=>{if(peer==p&&!cn){alert('Lobby not found');menu()}},15000);
+ nsub(T,async m=>{if(m.t=='offer'&&m.to==id&&!pc){pc=new RTCPeerConnection(ICE.config);pcs.push(pc);pc.ondatachannel=e=>cli(cn=new DCc(e.channel),p);await pc.setRemoteDescription({type:'offer',sdp:m.s});await pc.setLocalDescription(await pc.createAnswer());await gathered(pc);npub(T,{t:'answer',from:id,s:pc.localDescription.sdp})}},ab);
+ npub(T,{t:'join',id})}
 // ---- direct (serverless) connect: players swap two codes by hand (chat/message), no signaling server needed ----
 let direct=0,pcs=[],pend=null;
 class DCc{constructor(dc){this.dc=dc;this.h={};dc.onopen=()=>this.h.open&&this.h.open();dc.onmessage=e=>this.h.data&&this.h.data(JSON.parse(e.data));dc.onclose=()=>this.h.close&&this.h.close();if(dc.readyState=='open')setTimeout(()=>this.h.open&&this.h.open())}
