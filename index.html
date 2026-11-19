@@ -486,17 +486,28 @@ const ICE={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun
 // signaling servers tried in order (default = PeerJS cloud). Add your own, e.g. {host:'my-peer.onrender.com',port:443,secure:true,path:'/'}
 const SV=window.PEERS||[{host:'craftyunknown-peer.onrender.com',port:443,secure:true,path:'/'},{},{host:'peerjs.92k.de',port:443,secure:true,path:'/'}];
 // multiplayer server status: green = a signaling server is reachable, red = none, yellow = checking (also wakes a sleeping free-tier server)
-let busy=0;
-async function svc(){if(busy)return;busy=1;const el=$('sv'),t0=performance.now();el.dataset.s='c';el.textContent='Multiplayer: pinging...';
- const w=setTimeout(()=>{if(busy)el.textContent='Multiplayer: starting server...'},2500);
- const ok=await Promise.any(SV.map((v,i)=>{const a=new AbortController(),t=setTimeout(()=>a.abort(),i==0&&v.host?60000:8000);return fetch('https://'+(v.host||'0.peerjs.com')+'/',{mode:'no-cors',signal:a.signal,cache:'no-store'}).then(()=>performance.now()-t0).finally(()=>clearTimeout(t))})).catch(()=>0);
- clearTimeout(w);busy=0;el.dataset.s=ok?'g':'r';el.textContent='Multiplayer: '+(ok?'online ('+Math.round(ok)+' ms)':'offline')}
+let busy=0,LR=[];
+// probe a signaling server: plain HTTPS reachability and a real WebSocket (what PeerJS needs)
+const probe=(v,i)=>{const h=v.host||'0.peerjs.com',t0=performance.now(),to=i==0&&v.host?60000:8000,rnd=()=>Math.random().toString(36).slice(2);
+ const http=fetch('https://'+h+'/',{mode:'no-cors',cache:'no-store',signal:AbortSignal.timeout(to)}).then(()=>Math.round(performance.now()-t0),()=>0);
+ const ws=new Promise(res=>{let w;try{w=new WebSocket('wss://'+h+'/peerjs?key=peerjs&id=chk'+rnd()+'&token='+rnd())}catch(e){return res(0)}
+  const t=setTimeout(()=>{res(0);w.close()},to);w.onopen=()=>{clearTimeout(t);res(Math.round(performance.now()-t0));w.close()};w.onerror=()=>{clearTimeout(t);res(0)}});
+ return Promise.all([http,ws]).then(([a,b])=>({h,http:a,ws:b}))};
+async function svc(){if(busy)return;busy=1;const el=$('sv');el.dataset.s='c';el.textContent='Multiplayer: pinging...';LR=[];
+ const w=setTimeout(()=>{if(el.dataset.s=='c')el.textContent='Multiplayer: starting server...'},2500);
+ const upd=()=>{const b=LR.filter(r=>r.ws).sort((a,b)=>a.ws-b.ws)[0];
+  if(b){el.dataset.s='g';el.textContent='Multiplayer: online ('+b.ws+' ms)'}else if(LR.length==SV.length){el.dataset.s='r';el.textContent='Multiplayer: '+(LR.some(r=>r.http)?'blocked (WebSocket)':'offline')}
+  el.title=LR.map(r=>r.h+': https '+(r.http?r.http+' ms':'fail')+', websocket '+(r.ws?r.ws+' ms':'fail')).join('\n')};
+ await Promise.all(SV.map(async(v,i)=>{LR.push(await probe(v,i));upd()}));clearTimeout(w);busy=0}
+async function fail(t){show('<h2>Cannot reach multiplayer server</h2><p class=hw>'+NET+'</p><p id=dgn class=hw>Running connection test...</p><button onclick=menu()>Back</button>');
+ const R=await Promise.all(SV.map(probe)),h=R.some(r=>r.http);
+ if($('dgn'))$('dgn').textContent=R.map(r=>(r.ws?'OK  ':r.http?'WebSocket blocked  ':'Unreachable  ')+r.h).join('\n')+'\nError: '+t+'\n\n'+(R.some(r=>r.ws)?'A server is reachable, try again.':h?'This network or browser allows the website but blocks WebSockets. Try turning off VPN, ad blockers or other extensions, or use a different network.':'No server could be reached. Check your internet connection, VPN, firewall or DNS.')}
 svc();setInterval(svc,60000);
 const mkp=(i,id)=>new Peer(id,{...ICE,...SV[i]});
 const NET='Could not reach the multiplayer server. Check your connection (or disable ad/tracker blockers) and try again.';
 const bad=e=>['network','server-error','socket-error','socket-closed','disconnected'].includes(e.type);
 function host(n=0,i=0){const k=g;leave();g=k;show('<h2>Creating lobby...</h2><button onclick=menu()>Cancel</button>');code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const p=peer=mkp(i,'cuhub-'+code);
- p.on('error',e=>{if(peer!=p)return;if(e.type=='unavailable-id')host(n,i);else if(bad(e)&&i<SV.length-1)host(n,i+1);else if(bad(e)&&n<2)setTimeout(()=>{if(peer==p)host(n+1,0)},1200);else{alert(e.type+': '+NET);menu()}});
+ p.on('error',e=>{if(peer!=p)return;if(e.type=='unavailable-id')host(n,i);else if(bad(e)&&i<SV.length-1)host(n,i+1);else if(bad(e)&&n<2)setTimeout(()=>{if(peer==p)host(n+1,0)},1200);else fail(e.type)});
  p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
  p.on('open',lob);
  p.on('connection',c=>{
@@ -505,7 +516,7 @@ function host(n=0,i=0){const k=g;leave();g=k;show('<h2>Creating lobby...</h2><bu
   c.on('close',()=>{if(peer==p&&!started){conns=conns.filter(x=>x!=c);lob()}})})}
 function join(n=0,cd,i=0){code=cd||$('cd').value.trim().toUpperCase();leave();show('<h2>Connecting...</h2><button onclick=menu()>Cancel</button>');const p=peer=mkp(i);
  setTimeout(()=>{if(peer==p&&!started&&!$('n')){alert('Could not connect to that lobby. Check the code and try again.');menu()}},20000);
- p.on('error',e=>{if(peer!=p)return;const nx=e.type=='peer-unavailable'||bad(e);if(nx&&i<SV.length-1)join(n,code,i+1);else if(bad(e)&&n<2)setTimeout(()=>{if(peer==p)join(n+1,code,0)},1200);else if(e.type=='peer-unavailable'){alert('Lobby not found');menu()}else{alert(e.type+': '+NET);menu()}});
+ p.on('error',e=>{if(peer!=p)return;const nx=e.type=='peer-unavailable'||bad(e);if(nx&&i<SV.length-1)join(n,code,i+1);else if(bad(e)&&n<2)setTimeout(()=>{if(peer==p)join(n+1,code,0)},1200);else if(e.type=='peer-unavailable'){alert('Lobby not found');menu()}else fail(e.type)});
  p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
  p.on('open',()=>{const c=cn=p.connect('cuhub-'+code);
   c.on('open',()=>show(`<h2>Lobby ${code}</h2><p id=n>Connected</p><button onclick=menu()>Leave</button>`));
