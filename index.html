@@ -7,6 +7,7 @@ html,body{margin:0;height:100%;background:#111;color:#eee;font:16px sans-serif;o
 button,input{font:inherit;background:#222;color:#eee;border:1px solid #555;padding:8px 14px;margin:4px}
 button{cursor:pointer}
 [hidden]{display:none!important}
+#cf{position:fixed;inset:0;pointer-events:none;z-index:5}
 #pop{position:fixed;top:30%;left:50%;transform:translateX(-50%);z-index:4;background:#222;border:1px solid #888;padding:24px 40px;font-size:32px;text-align:center}
 #m{position:fixed;top:8px;left:8px;z-index:3;font-size:20px}
 #clock{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;font:14vw monospace}
@@ -22,6 +23,7 @@ button{cursor:pointer}
 <label id="aw"><input type="checkbox" id="wl" checked> Keep screen awake</label>
 <div id="p" hidden></div>
 <div id="pop" hidden></div>
+<canvas id="cf" hidden></canvas>
 <canvas id="cv" width="600" height="600"></canvas>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
@@ -51,6 +53,12 @@ const mv=(b,i)=>{const q=b[i],w=q<'a',t=q.toLowerCase(),x=i%8,y=i>>3,r=[];
  else if(t=='k')for(let a=-1;a<2;a++)for(let d=-1;d<2;d++)add(x+a,y+d);
  else for(const[a,d]of[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){if(t=='b'&&!(a&&d)||t=='r'&&a&&d)continue;for(let k=1;add(x+a*k,y+d*k);k++);}
  return r};
+
+// ---- reversi / snake helpers ----
+const D8=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+const fl=(b,i,v)=>{const r=[];if(b[i])return r;for(const[a,d]of D8){const t=[];let X=i%8+a,Y=(i>>3)+d;while(X>=0&&X<8&&Y>=0&&Y<8&&b[Y*8+X]==3-v){t.push(Y*8+X);X+=a;Y+=d}if(t.length&&X>=0&&X<8&&Y>=0&&Y<8&&b[Y*8+X]==v)r.push(...t)}return r};
+const mvs=(b,v)=>b.some((_,i)=>fl(b,i,v).length);
+const food=s=>{do s.f=[Math.random()*30|0,Math.random()*30|0];while(s.p.some(q=>q.b.some(([x,y])=>x==s.f[0]&&y==s.f[1])))};
 
 // ---- tetris ----
 const PC=[[[0,0],[1,0],[2,0],[3,0]],[[0,0],[1,0],[0,1],[1,1]],[[0,0],[1,0],[2,0],[1,1]],[[0,0],[1,0],[2,0],[0,1]],[[0,0],[1,0],[2,0],[2,1]],[[1,0],[2,0],[0,1],[1,1]],[[0,0],[1,0],[1,1],[2,1]]];
@@ -146,7 +154,7 @@ cards:{n:'Crazy Cards',min:2,max:4,
   else T(s.u==me?'Your turn':'',300,290,20);
   s.h[me].forEach((q,i)=>{const x=3+i%11*54,y=360+(i/11|0)*78;card(x,y,q);if(s.u==me&&ok(s,q))R(x,y+72,50,3,'#fff')})}},
 
-c4:{n:'Connect 4',min:2,max:2,
+c4:{n:'Connect 4',min:2,max:2,tie:1,
  init:()=>({b:Array(42).fill(0),t:0,w:null}),
  act(s,p,m){if(m.d!==1||m.x==null||p!=s.t||s.w!=null)return;const x=Math.floor((m.x*600-20)/80);if(x<0||x>6)return;
   for(let y=5;y>=0;y--)if(!s.b[y*7+x]){s.b[y*7+x]=p+1;const v=win(s.b,7,6,4);s.w=v?v-1:s.b.includes(0)?null:2;s.t=1-p;return}},
@@ -155,24 +163,76 @@ c4:{n:'Connect 4',min:2,max:2,
   this.act(s,1,ck(60+m*80,300))},
  draw(s,me){R(20,70,560,480,'#444');s.b.forEach((v,i)=>O(60+i%7*80,110+(i/7|0)*80,32,['#111','#fff','#e44'][v]));T(msg(s,me)+(me?' (red)':' (white)'),300,35,22)}},
 
-ttt:{n:'Tic-tac-toe',min:2,max:2,
+ttt:{n:'Tic-tac-toe',min:2,max:2,tie:1,
  init:()=>({b:Array(9).fill(0),t:0,w:null}),
  act(s,p,m){if(m.d!==1||m.x==null||p!=s.t||s.w!=null)return;const X=Math.floor((m.x*600-30)/180),Y=Math.floor((m.y*600-50)/180),i=Y*3+X;
   if(X<0||X>2||Y<0||Y>2||s.b[i])return;s.b[i]=p+1;const v=win(s.b,3,3,3);s.w=v?v-1:s.b.includes(0)?null:2;s.t=1-p},
  ai(s){if(s.t!=1||s.w!=null)return;const e=[...s.b.keys()].filter(i=>!s.b[i]),t=(i,v)=>{s.b[i]=v;const w=win(s.b,3,3,3);s.b[i]=0;return w};
   const m=e.find(i=>t(i,2))??e.find(i=>t(i,1))??(s.b[4]?e[Math.random()*e.length|0]:4);this.act(s,1,ck(120+m%3*180,140+(m/3|0)*180))},
- draw(s,me){s.b.forEach((v,i)=>{const x=30+i%3*180,y=50+(i/3|0)*180;R(x+2,y+2,176,176,'#222');T(['','X','O'][v],x+90,y+95,120)});T(msg(s,me)+(me?' (O)':' (X)'),300,25,22)}}
+ draw(s,me){s.b.forEach((v,i)=>{const x=30+i%3*180,y=50+(i/3|0)*180;R(x+2,y+2,176,176,'#222');T(['','X','O'][v],x+90,y+95,120)});T(msg(s,me)+(me?' (O)':' (X)'),300,25,22)}},
+
+gomoku:{n:'Gomoku',min:2,max:2,tie:1,
+ init:()=>({b:Array(225).fill(0),t:0,w:null}),
+ act(s,p,m){if(m.d!==1||m.x==null||p!=s.t||s.w!=null)return;const X=Math.floor((m.x*600-30)/36),Y=Math.floor((m.y*600-45)/36),i=Y*15+X;
+  if(X<0||X>14||Y<0||Y>14||s.b[i])return;s.b[i]=p+1;const v=win(s.b,15,15,5);s.w=v?v-1:s.b.includes(0)?null:2;s.t=1-p},
+ ai(s){if(s.t!=1||s.w!=null)return;let best=-1,bi=0;
+  s.b.forEach((q,i)=>{if(q)return;let v=Math.random();const x=i%15,y=i/15|0;
+   for(let a=-1;a<2;a++)for(let d=-1;d<2;d++){const X=x+a,Y=y+d;if(X>=0&&X<15&&Y>=0&&Y<15&&s.b[Y*15+X])v++}
+   s.b[i]=2;if(win(s.b,15,15,5))v+=1e3;s.b[i]=1;if(win(s.b,15,15,5))v+=500;s.b[i]=0;if(v>best){best=v;bi=i}});
+  this.act(s,1,ck(48+bi%15*36,63+(bi/15|0)*36))},
+ draw(s,me){c.strokeStyle='#555';c.beginPath();for(let i=0;i<15;i++){c.moveTo(48,63+i*36);c.lineTo(552,63+i*36);c.moveTo(48+i*36,63);c.lineTo(48+i*36,567)}c.stroke();
+  s.b.forEach((v,i)=>{if(v){O(48+i%15*36,63+(i/15|0)*36,15,'#888');O(48+i%15*36,63+(i/15|0)*36,13,['','#fff','#222'][v])}});T(msg(s,me)+(me?' (black)':' (white)'),300,22,20)}},
+
+reversi:{n:'Reversi',min:2,max:2,tie:1,
+ init:()=>{const b=Array(64).fill(0);b[27]=b[36]=1;b[28]=b[35]=2;return{b,t:0,w:null}},
+ act(s,p,m){if(m.d!==1||m.x==null||p!=s.t||s.w!=null)return;const X=Math.floor((m.x*600-20)/70),Y=Math.floor((m.y*600-20)/70);if(X<0||X>7||Y<0||Y>7)return;
+  const i=Y*8+X,f=fl(s.b,i,p+1);if(!f.length)return;s.b[i]=p+1;f.forEach(j=>s.b[j]=p+1);
+  if(mvs(s.b,2-p))s.t=1-p;else if(!mvs(s.b,p+1)){const a=s.b.filter(v=>v==1).length,e=s.b.filter(v=>v==2).length;s.w=a>e?0:e>a?1:2}},
+ ai(s){if(s.t!=1||s.w!=null)return;let bi,bs=-1;s.b.forEach((_,i)=>{const n=fl(s.b,i,2).length;if(n){const v=n+([0,7,56,63].includes(i)?10:0)+Math.random();if(v>bs){bs=v;bi=i}}});this.act(s,1,ck(55+bi%8*70,55+(bi>>3)*70))},
+ draw(s,me){for(let i=0;i<64;i++){const px=20+i%8*70,py=20+(i>>3)*70,v=s.b[i];R(px,py,70,70,(i%8+(i>>3))%2?'#555':'#666');
+   if(v)O(px+35,py+35,28,['','#fff','#111'][v]);else if(s.t==me&&s.w==null&&fl(s.b,i,me+1).length)O(px+35,py+35,6,'#999')}
+  T(msg(s,me)+'  |  White '+s.b.filter(v=>v==1).length+' - Black '+s.b.filter(v=>v==2).length+'  |  You: '+(me?'black':'white'),300,590,16)}},
+
+snake:{n:'Snake',min:1,max:2,tie:1,
+ init:n=>{const s={p:Array.from({length:n},(_,i)=>({b:[0,1,2].map(k=>[i?24+k:5-k,15]),d:[i?-1:1,0],n:[i?-1:1,0]})),t:0,w:null};food(s);return s},
+ act(s,p,m){const q=s.p[p];let d;
+  if(m.k&&m.d)d={ArrowLeft:[-1,0],a:[-1,0],ArrowRight:[1,0],d:[1,0],ArrowUp:[0,-1],w:[0,-1],ArrowDown:[0,1],s:[0,1]}[m.k];
+  else if(m.d===1&&m.x!=null)d=m.x<.5?[q.n[1],-q.n[0]]:[-q.n[1],q.n[0]];
+  if(d&&(d[0]!=-q.d[0]||d[1]!=-q.d[1]))q.n=d},
+ tick(s,dt){s.t+=dt;if(s.t<.12||s.w!=null)return;s.t=0;
+  const h=s.p.map(q=>{q.d=q.n;return[q.b[0][0]+q.d[0],q.b[0][1]+q.d[1]]});
+  const dead=h.map(([x,y],i)=>x<0||x>29||y<0||y>29||s.p.some(q=>q.b.some(([a,b])=>a==x&&b==y))||h.some(([a,b],j)=>j!=i&&a==x&&b==y));
+  s.p.forEach((q,i)=>{if(dead[i])return;q.b.unshift(h[i]);if(h[i][0]==s.f[0]&&h[i][1]==s.f[1])food(s);else q.b.pop()});
+  const al=dead.map((d,i)=>d?-1:i).filter(i=>i>=0);
+  if(s.p.length==1?dead[0]:al.length<2)s.w=s.p.length==1?1:al.length?al[0]:2},
+ draw(s,me){R(28,43,544,544,'#444');R(30,45,540,540,'#111');
+  s.p.forEach((q,i)=>q.b.forEach(([x,y],k)=>R(31+x*18,46+y*18,16,16,i?(k?'#777':'#aaa'):(k?'#ccc':'#fff'))));
+  R(31+s.f[0]*18,46+s.f[1]*18,16,16,'#e44');
+  T(s.p.map((q,i)=>(i==me?'You':'P'+(i+1))+': '+q.b.length).join('     '),300,22,20)}},
+
+rps:{n:'Rock Paper Scissors',min:2,max:2,
+ init:()=>({c:[-1,-1],sc:[0,0],l:null,t:1,w:null}), // t:1 lets the AI answer on its delay
+ act(s,p,m){if(m.d!==1||m.x==null||s.w!=null||s.c[p]>=0)return;const i=Math.floor((m.x*600-30)/190);if(m.y<.5||m.y>.7||i<0||i>2||(m.x*600-30)%190>170)return;s.c[p]=i;
+  if(s.c[0]>=0&&s.c[1]>=0){const d=(s.c[0]-s.c[1]+3)%3;s.l=s.c;if(d)s.sc[d==1?0:1]++;s.c=[-1,-1];if(s.sc[0]>2)s.w=0;else if(s.sc[1]>2)s.w=1}},
+ ai(s){if(s.c[1]<0&&s.w==null)this.act(s,1,ck(115+(Math.random()*3|0)*190,360))},
+ draw(s,me){const N=['Rock','Paper','Scissors'];T(s.sc[me]+'  -  '+s.sc[1-me],300,60,44);T('First to 3',300,100,16,'#888');
+  N.forEach((n,i)=>{R(30+i*190,300,170,120,s.c[me]==i?'#888':'#333');T(n,115+i*190,360,22)});
+  if(s.l)T('You: '+N[s.l[me]]+'   Opponent: '+N[s.l[1-me]],300,200,24);
+  T(s.c[me]>=0?'Waiting for opponent...':'Pick one',300,500,20)}}
 };
 Object.entries(G).forEach(([k,v])=>v.k=k);
 
 // ---- framework: host runs the game and broadcasts state; clients send input ----
 let g,S,me,cn,peer,iv,code,started,bot,bt=0,conns=[];
+function confetti(){const f=$('cf'),x=f.getContext('2d'),W=f.width=innerWidth,H=f.height=innerHeight,t0=Date.now();f.hidden=false;
+ const ps=Array.from({length:150},()=>({x:Math.random()*W,y:-Math.random()*H,v:3+Math.random()*4,a:Math.random()*6,s:5+Math.random()*6,c:`hsl(${Math.random()*360},80%,60%)`}));
+ (function z(){x.clearRect(0,0,W,H);ps.forEach(p=>{p.y+=p.v;p.a+=.1;p.x+=Math.sin(p.a);x.fillStyle=p.c;x.fillRect(p.x,p.y,p.s,p.s*.6)});if(Date.now()-t0<4000)requestAnimationFrame(z);else f.hidden=true})()}
 let shown='',np,want=new Set;
 const popup=(t,x='')=>{PU.innerHTML=t+x+'<br><button onclick="rm()">Rematch</button><button onclick="PU.hidden=1">Close</button>';PU.hidden=false};
 const ask=l=>{if(shown)popup(shown,l.includes(me)?'<p>Waiting for opponent...</p>':l.length?'<p>Opponent wants a rematch</p>':'')};
 const draw=()=>{if(!S)return;R(0,0,600,600,'#111');g.draw(S,me);
- const t=S.w==null?'':S.w==2&&(g.k=='ttt'||g.k=='c4')?'Draw':S.w==me?'You win!':g.k=='cards'?'P'+(S.w+1)+' wins':'You lose';
- if(t!=shown){shown=t;if(t)popup(t)}};
+ const t=S.w==null?'':S.w==2&&g.tie?'Draw':S.w==me?'You win!':g.k=='cards'?'P'+(S.w+1)+' wins':'You lose';
+ if(t!=shown){shown=t;if(t)popup(t);if(t=='You win!')confetti()}};
 function rem(p){want.add(p);if(want.size>=(bot?1:np)){want=new Set;S=g.init(np);shown='';PU.hidden=true;conns.forEach(c=>c.send({rs:1}))}else{const l=[...want];ask(l);conns.forEach(c=>c.send({rq:l}))}}
 const rm=()=>cn?cn.send({rm:1}):rem(0);
 const show=h=>{P.innerHTML=h;P.hidden=false};
@@ -195,7 +255,7 @@ function join(){code=$('cd').value.trim().toUpperCase();leave();const p=peer=new
   c.on('data',m=>{if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.rq)ask(m.rq);if(m.rs){shown='';PU.hidden=true}if(m.s){S=m.s;draw()}});
   c.on('close',()=>{if(peer==p){alert('Disconnected');menu()}})})}
 function go(n,b){started=1;bot=b;np=n;S=g.init(n);me=0;conns.forEach((c,i)=>c.send({g:g.k,me:i+1}));begin()}
-function begin(){P.hidden=true;cv.style.display='block';$('clock').hidden=$('aw').hidden=true;if(!cn)iv=setInterval(()=>{if(bot){const a=S.t??S.u;if(g.mv)g.ai(S);else if(a!=1)bt=0;else if((bt+=1/30)>.9){bt=0;g.ai(S)}}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}));draw()},33)}
+function begin(){P.hidden=true;cv.style.display='block';$('clock').hidden=$('aw').hidden=true;if(!cn)iv=setInterval(()=>{if(bot){const a=S.u??S.t;if(g.mv)g.ai(S);else if(a!=1)bt=0;else if((bt+=1/30)>.9){bt=0;g.ai(S)}}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}));draw()},33)}
 
 // input
 onkeydown=onkeyup=e=>{if(!S||cv.style.display!='block'||e.repeat)return;send({k:e.key.replace(/^.$/,x=>x.toLowerCase()),d:+(e.type=='keydown')});if(e.key[0]=='A'||e.key==' ')e.preventDefault()};
