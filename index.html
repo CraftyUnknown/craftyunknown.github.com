@@ -75,6 +75,11 @@ const nb=i=>{const r=[],x=i%9,y=i/9|0;for(let a=-1;a<2;a++)for(let d=-1;d<2;d++)
 const rev=(s,i)=>{if(!s.m){s.m=Array(81).fill(0);[...Array(81).keys()].filter(j=>j!=i&&!nb(i).includes(j)).sort(()=>Math.random()-.5).slice(0,10).forEach(j=>s.m[j]=1)}
  if(s.m[i]){s.w=1;return}const st=[i];while(st.length){const j=st.pop();if(s.r[j]==1)continue;s.r[j]=1;if(!nb(j).some(k=>s.m[k]))nb(j).forEach(k=>s.r[k]!=1&&st.push(k))}
  if(s.r.filter(v=>v==1).length==71)s.w=0};
+const blk=(s,x,y,r)=>s.bl.some(b=>x>b.x-r&&x<b.x+b.w+r&&y>b.y-r&&y<b.y+b.h+r);
+const slide=(s,o,dx,dy,r)=>{let m=0;if(!blk(s,o.x+dx,o.y,r)){o.x+=dx;m=1}if(!blk(s,o.x,o.y+dy,r)){o.y+=dy;m=1}return m};
+const blocks=()=>{const L=[];for(let i=0;i<400&&L.length<7;i++){const v=Math.random()<.5,w=(v?30:50)+Math.random()*50|0,h=(v?50:30)+Math.random()*50|0,x=60+Math.random()*(480-w)|0,y=60+Math.random()*(480-h)|0;
+ const cx=Math.max(x,Math.min(300,x+w)),cy=Math.max(y,Math.min(300,y+h));
+ if(Math.hypot(cx-300,cy-300)>100&&L.every(b=>x>b.x+b.w+40||x+w<b.x-40||y>b.y+b.h+40||y+h<b.y-40))L.push({x,y,w,h})}return L};
 const PCL=['#fff','#6af','#fc6','#6c6'];
 
 const CN={p:'pawn',n:'knight',b:'bishop',r:'rook',q:'queen',k:'king'};
@@ -253,19 +258,19 @@ rps:{n:'Rock Paper Scissors',min:2,max:2,
 
 shooter:{n:'Shooter',min:1,max:4,mv:1,
  res:s=>'Game over - '+s.k+' kills',
- init:n=>({p:Array.from({length:n},(_,i)=>({x:[300,260,340,300][i],y:[300,300,300,260][i],h:5,ks:[0,0,0,0],f:0,sh:0,tx:300,ty:200})),e:[],b:[],k:0,t:0,w:null}),
+ init:n=>({p:Array.from({length:n},(_,i)=>({x:[300,260,340,300][i],y:[300,300,300,260][i],h:5,ks:[0,0,0,0],f:0,sh:0,tx:300,ty:200})),e:[],b:[],bl:blocks(),k:0,t:0,w:null}),
  act(s,p,m){const q=s.p[p];if(m.k){const i=['ArrowLeft,a','ArrowRight,d','ArrowUp,w','ArrowDown,s'].findIndex(x=>x.split(',').includes(m.k));if(i>=0)q.ks[i]=m.d;else if(m.k==' ')q.sh=m.d}else if(m.x!=null){q.tx=m.x*600;q.ty=m.y*600;if(m.d!=2)q.sh=m.d}},
  tick(s,dt){if(s.w!=null)return;s.t+=dt;const A=s.p.filter(q=>q.h>0),cl=(v,a,b)=>Math.max(a,Math.min(b,v));
-  A.forEach(q=>{const k=q.ks;q.x=cl(q.x+(k[1]-k[0])*200*dt,10,590);q.y=cl(q.y+(k[3]-k[2])*200*dt,10,590);q.f-=dt;
+  A.forEach(q=>{const k=q.ks;slide(s,q,(k[1]-k[0])*200*dt,(k[3]-k[2])*200*dt,10);q.x=cl(q.x,10,590);q.y=cl(q.y,10,590);q.f-=dt;
    if(q.sh&&q.f<=0){q.f=.2;const a=Math.atan2(q.ty-q.y,q.tx-q.x);s.b.push({x:q.x,y:q.y,vx:Math.cos(a)*500,vy:Math.sin(a)*500,l:1})}});
-  s.b.forEach(b=>{b.x+=b.vx*dt;b.y+=b.vy*dt;b.l-=dt});
-  if(Math.random()<dt*(.8+s.t/40)*s.p.length){const a=Math.random()*4|0,v=Math.random()*600;s.e.push({x:[v,v,0,600][a],y:[0,600,v,v][a],h:2})}
-  s.e.forEach(e=>{let n,dm=1e9;A.forEach(q=>{const d=Math.hypot(q.x-e.x,q.y-e.y);if(d<dm){dm=d;n=q}});if(!n)return;const sp=Math.min(130,60+s.t)*dt;e.x+=(n.x-e.x)/(dm||1)*sp;e.y+=(n.y-e.y)/(dm||1)*sp;
+  s.b.forEach(b=>{b.x+=b.vx*dt;b.y+=b.vy*dt;b.l-=dt;if(blk(s,b.x,b.y,0))b.l=0});
+  if(Math.random()<dt*(.8+s.t/40)*s.p.length){const a=Math.random()*4|0,v=Math.random()*600;{const m=2+Math.min(3,s.t/45|0);s.e.push({x:[v,v,0,600][a],y:[0,600,v,v][a],h:m,m})}}
+  s.e.forEach(e=>{let n,dm=1e9;A.forEach(q=>{const d=Math.hypot(q.x-e.x,q.y-e.y);if(d<dm){dm=d;n=q}});if(!n)return;const sp=Math.min(130,60+s.t)*dt;{const mx=(n.x-e.x)/(dm||1)*sp,my=(n.y-e.y)/(dm||1)*sp;if(!slide(s,e,mx,my,8))slide(s,e,-my,mx,8)}
    if(dm<18){n.h--;e.h=0;if(n.h<=0)lg(s,s.p.indexOf(n),'% went down')}
    s.b.forEach(b=>{if(b.l>0&&e.h>0&&Math.hypot(b.x-e.x,b.y-e.y)<14){e.h--;b.l=0;if(e.h<=0)s.k++}})});
   s.b=s.b.filter(b=>b.l>0&&b.x>0&&b.x<600&&b.y>0&&b.y<600);s.e=s.e.filter(e=>e.h>0);
   if(!s.p.some(q=>q.h>0))s.w=-1},
- draw(s,me){s.e.forEach(e=>R(e.x-8,e.y-8,16,16,'#e44'));s.b.forEach(b=>O(b.x,b.y,3,'#ff6'));
+ draw(s,me){s.bl.forEach(b=>{R(b.x,b.y,b.w,b.h,'#888');R(b.x+2,b.y+2,b.w-4,b.h-4,'#444')});s.e.forEach(e=>{R(e.x-8,e.y-8,16,16,'#e44');R(e.x-10,e.y-16,20,3,'#444');R(e.x-10,e.y-16,20*e.h/e.m,3,'#6c6')});s.b.forEach(b=>O(b.x,b.y,3,'#ff6'));
   s.p.forEach((q,i)=>{if(q.h<=0)return O(q.x,q.y,10,'#444');const a=Math.atan2(q.ty-q.y,q.tx-q.x);c.strokeStyle='#ccc';c.beginPath();c.moveTo(q.x,q.y);c.lineTo(q.x+Math.cos(a)*20,q.y+Math.sin(a)*20);c.stroke();O(q.x,q.y,10,PCL[i])});
   T('Kills '+s.k+'   '+s.p.map((q,i)=>(i==me?'You':'P'+(i+1))+' HP '+Math.max(0,q.h)).join('  '),300,16,16);T('WASD/arrows move, mouse aim, click or space shoot',300,590,14,'#888')}},
 
