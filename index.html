@@ -7,6 +7,8 @@ html,body{margin:0;height:100%;background:#111;color:#eee;font:16px sans-serif;o
 button,input{font:inherit;background:#222;color:#eee;border:1px solid #555;padding:8px 14px;margin:4px}
 button{cursor:pointer}
 [hidden]{display:none!important}
+#ts{position:fixed;top:56px;right:12px;z-index:4;pointer-events:none;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+#ts div{background:#222;border:1px solid #555;padding:8px 12px;font-size:15px}
 #cf{position:fixed;inset:0;pointer-events:none;z-index:5}
 #pop{position:fixed;top:30%;left:50%;transform:translateX(-50%);z-index:4;background:#222;border:1px solid #888;padding:24px 40px;font-size:32px;text-align:center}
 #m{position:fixed;top:8px;left:8px;z-index:3;font-size:20px}
@@ -23,6 +25,7 @@ button{cursor:pointer}
 <label id="aw"><input type="checkbox" id="wl" checked> Keep screen awake</label>
 <div id="p" hidden></div>
 <div id="pop" hidden></div>
+<div id="ts"></div>
 <canvas id="cf" hidden></canvas>
 <canvas id="cv" width="600" height="600"></canvas>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -42,6 +45,7 @@ const T=(t,x,y,s=24,col='#eee')=>{c.fillStyle=col;c.font=s+'px sans-serif';c.tex
 const R=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h)};
 const O=(x,y,r,col)=>{c.fillStyle=col;c.beginPath();c.arc(x,y,r,0,7);c.fill()};
 const ck=(x,y)=>({d:1,x:x/600,y:y/600});
+const lg=(s,p,t)=>{s.ln=(s.ln||0)+1;(s.lg=s.lg||[]).push([s.ln,p,t]);if(s.lg.length>30)s.lg.shift()};
 const msg=(s,me)=>s.w==null?(s.t==me?'Your turn':"Opponent's turn"):'Game over';
 const win=(b,W,H,n)=>{for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=b[y*W+x];if(!v)continue;for(const[dx,dy]of[[1,0],[0,1],[1,1],[1,-1]]){let k=1;while(k<n&&x+dx*k>=0&&x+dx*k<W&&y+dy*k>=0&&y+dy*k<H&&b[(y+dy*k)*W+x+dx*k]==v)k++;if(k==n)return v}}return 0};
 
@@ -73,13 +77,17 @@ const rev=(s,i)=>{if(!s.m){s.m=Array(81).fill(0);[...Array(81).keys()].filter(j=
  if(s.r.filter(v=>v==1).length==71)s.w=0};
 const PCL=['#fff','#6af','#fc6','#6c6'];
 
+const CN={p:'pawn',n:'knight',b:'bishop',r:'rook',q:'queen',k:'king'};
+const att=(b,wh)=>{const k=b.indexOf(wh?'K':'k');return b.some((o,x)=>o&&(o<'a')==!wh&&mv(b,x).includes(k))};
+const lm=(b,i)=>mv(b,i).filter(j=>{const n=[...b];n[j]=n[i];n[i]='';return!att(n,b[i]<'a')});
+
 // ---- tetris ----
 const PC=[[[0,0],[1,0],[2,0],[3,0]],[[0,0],[1,0],[0,1],[1,1]],[[0,0],[1,0],[2,0],[1,1]],[[0,0],[1,0],[2,0],[0,1]],[[0,0],[1,0],[2,0],[2,1]],[[1,0],[2,0],[0,1],[1,1]],[[0,0],[1,0],[1,1],[2,1]]];
 const hit=(b,k,x,y)=>k.some(([a,d])=>{const X=x+a,Y=y+d;return X<0||X>9||Y>19||(Y>=0&&b[Y][X])});
 const spawn=q=>{q.k=PC[Math.random()*7|0];q.x=3;q.y=0;q.o=hit(q.b,q.k,3,0)};
 const lock=(s,i)=>{const q=s.p[i];q.k.forEach(([a,d])=>{if(q.y+d>=0)q.b[q.y+d][q.x+a]=1});q.b=q.b.filter(r=>r.includes(0));const n=20-q.b.length;
  while(q.b.length<20)q.b.unshift(Array(10).fill(0));q.sc+=[0,100,300,500,800][n];
- const e=s.p[1-i];if(n>1&&e)e.g+=n-1;
+ const e=s.p[1-i];if(n>1&&e){e.g+=n-1;lg(s,i,'% sent '+(n-1)+' garbage')}
  for(;q.g>0;q.g--){q.b.shift();const r=Array(10).fill(1);r[Math.random()*10|0]=0;q.b.push(r)}spawn(q)};
 const step=(s,i)=>{const q=s.p[i];hit(q.b,q.k,q.x,q.y+1)?lock(s,i):q.y++};
 
@@ -88,7 +96,9 @@ const dr=()=>{const r=Math.random();return r<.06?'kW':'rygb'[Math.random()*4|0]+
 const CC={r:'#b33',y:'#a90',g:'#383',b:'#359',k:'#333'};
 const ok=(s,q)=>q[0]=='k'||q[0]==s.c||q[1]==s.t[1];
 const nx=(s,k=1)=>{const n=s.h.length;s.u=((s.u+s.d*k)%n+n)%n};
-const card=(x,y,q,big)=>{R(x,y,big?60:50,big?84:70,CC[q[0]]);T({S:'⊘',R:'⇄','+':'+2',W:'★'}[q[1]]||q[1],x+(big?30:25),y+(big?42:35),big?30:22,'#fff')};
+const card=(x,y,q,w)=>{const h=w*1.4,l={S:'⊘',R:'⇄','+':'+2',W:'★'}[q[1]]||q[1];R(x,y,w,h,'#ddd');R(x+2,y+2,w-4,h-4,CC[q[0]]);T(l,x+w*.22,y+w*.24,w*.24,'#fff');T(l,x+w/2,y+h/2,w*.5,'#fff')};
+const hx=n=>{const st=n>1?Math.min(64,490/(n-1)):0;return[st,(600-((n-1)*st+70))/2]};
+const nm=q=>(q[0]=='k'?'Wild':{r:'Red',y:'Yellow',g:'Green',b:'Blue'}[q[0]]+' '+({S:'Skip',R:'Reverse','+':'+2'}[q[1]]||q[1]));
 
 // game = {n:name, min, max, init(n), act(s,player,msg), tick(s,dt), draw(s,me)}
 // msg: {k:key,d:down?} or {x,y:0..1,d:1 down|0 up|2 move}
@@ -99,7 +109,7 @@ pong:{n:'Pong',min:2,max:2,mv:1,
  tick(s,dt){const b=s.b;s.p=s.p.map((y,i)=>Math.max(50,Math.min(550,y+s.d[i]*400*dt)));b[0]+=b[2]*dt;b[1]+=b[3]*dt;
   if(b[1]<8||b[1]>592){b[3]*=-1;b[1]=Math.max(8,Math.min(592,b[1]))}
   for(const i of[0,1])if(Math.abs(b[0]-(i?580:20))<18&&Math.abs(b[1]-s.p[i])<55&&(b[2]<0)==!i){b[2]*=-1.05;b[3]=Math.max(-450,Math.min(450,b[3]+(b[1]-s.p[i])*3))}
-  if(b[0]<0||b[0]>600){s.sc[b[0]<0?1:0]++;s.b=[300,300,b[0]<0?260:-260,140]}},
+  if(b[0]<0||b[0]>600){const w=b[0]<0?1:0;s.sc[w]++;lg(s,w,'% scored');s.b=[300,300,b[0]<0?260:-260,140]}},
  ai(s){const e=s.b[1]-s.p[1];s.d[1]=s.b[2]>0&&Math.abs(e)>15?Math.sign(e)*.75:0},
  draw(s,me){R(10,s.p[0]-50,10,100,'#eee');R(580,s.p[1]-50,10,100,'#eee');R(s.b[0]-6,s.b[1]-6,12,12,'#eee');T(s.sc[0]+'   '+s.sc[1],300,40,40);T(me?'You: right':'You: left',300,585,16,'#888')}},
 
@@ -131,17 +141,21 @@ tetris:{n:'Tetris',min:1,max:2,
   if(!q.o)q.k.forEach(([a,d])=>R(ox+(q.x+a)*28+1,20+(q.y+d)*28+1,26,26,'#fff'));
   T(q.sc+(i==me?' (you)':''),ox+140,592,16);if(q.o)T('GAME OVER',ox+140,300,30)})}},
 
-chess:{n:'Chess',min:2,max:2,
+chess:{n:'Chess',min:2,max:2,tie:1,
  init:()=>({b:[...'rnbqkbnrpppppppp'].concat(Array(32).fill(''),[...'PPPPPPPPRNBQKBNR']),t:0,s:-1,w:null,l:null}),
  act(s,p,m){if(m.d!==1||m.x==null||s.w!=null||p!=s.t)return;let X=Math.floor((m.x*600-20)/70),Y=Math.floor((m.y*600-20)/70);if(X<0||X>7||Y<0||Y>7)return;if(p){X=7-X;Y=7-Y}
   const i=Y*8+X,b=s.b;
-  if(s.s>=0&&mv(b,s.s).includes(i)){const o=b[i];s.l=[s.s,i];s.lp=p;b[i]=b[s.s];b[s.s]='';if(b[i]=='P'&&i<8)b[i]='Q';if(b[i]=='p'&&i>55)b[i]='q';if(o.toLowerCase()=='k')s.w=p;s.t=1-p;s.s=-1}
+  if(s.s>=0&&lm(b,s.s).includes(i)){const o=b[i];s.l=[s.s,i];s.lp=p;b[i]=b[s.s];b[s.s]='';
+   if(b[i]=='P'&&i<8||b[i]=='p'&&i>55){b[i]=p?'q':'Q';lg(s,p,'% promoted a pawn')}
+   if(o)lg(s,p,'% captured a '+CN[o.toLowerCase()]);
+   s.t=1-p;s.s=-1;const wh=p==1,chk=att(b,wh);
+   if(!b.some((v,k)=>v&&(v<'a')==wh&&lm(b,k).length)){s.w=chk?p:2;lg(s,-1,chk?'Checkmate!':'Stalemate')}else if(chk)lg(s,-1,'Check!')}
   else s.s=b[i]&&(b[i]<'a')==!p?i:-1},
  ai(s){if(s.t!=1||s.w!=null)return;const V={p:1,n:3,b:3,r:5,q:9,k:99};let best,bs=-1e9;
-  s.b.forEach((q,i)=>{if(q<'a')return;mv(s.b,i).forEach(j=>{let v=(V[(s.b[j]||'').toLowerCase()]||0)+Math.random()*.5;const n=[...s.b];n[j]=q;n[i]='';
+  s.b.forEach((q,i)=>{if(q<'a')return;lm(s.b,i).forEach(j=>{let v=(V[(s.b[j]||'').toLowerCase()]||0)+Math.random()*.5;const n=[...s.b];n[j]=q;n[i]='';
    if(n.some((o,k)=>o&&o<'a'&&mv(n,k).includes(j)))v-=V[q];if(v>bs){bs=v;best=[i,j]}})});
   if(best)best.forEach(i=>this.act(s,1,ck(55+(7-i%8)*70,55+(7-(i>>3))*70)))},
- draw(s,me){const sel=s.s>=0?mv(s.b,s.s):[];
+ draw(s,me){const sel=s.s>=0?lm(s.b,s.s):[];
   for(let i=0;i<64;i++){let x=i%8,y=i>>3;if(me){x=7-x;y=7-y}const px=20+x*70,py=20+y*70,q=s.b[i];
    R(px,py,70,70,(i%8+(i>>3))%2?'#777':'#ccc');if(s.l&&s.lp!=me&&s.l.includes(i))R(px,py,70,70,'#b96');if(i==s.s)R(px,py,70,70,'#9a6');
    if(q){const w=q<'a',ch='♟♞♝♜♛♚'['pnbrqk'.indexOf(q.toLowerCase())]+'︎';c.font='56px sans-serif';c.textAlign='center';c.textBaseline='middle';c.lineWidth=2;c.strokeStyle=w?'#000':'#fff';c.fillStyle=w?'#fff':'#000';c.strokeText(ch,px+35,py+38);c.fillText(ch,px+35,py+38)}
@@ -149,23 +163,25 @@ chess:{n:'Chess',min:2,max:2,
   T(msg(s,me)+(me?' (black)':' (white)'),300,590,20)}},
 
 cards:{n:'Crazy Cards',min:2,max:4,
- init:n=>{const s={h:Array.from({length:n},()=>Array.from({length:7},dr)),u:0,d:1,w:null,pk:0};do s.t=dr();while(s.t[0]=='k');s.c=s.t[0];return s},
+ init:n=>{const s={h:Array.from({length:n},()=>Array.from({length:7},dr)),u:0,d:1,w:null,pk:0};do s.t=dr();while(s.t[0]=='k');s.c=s.t[0];s.pl=[[s.t,0]];return s},
  act(s,p,m){if(m.d!==1||m.x==null||s.w!=null||p!=s.u)return;const x=m.x*600,y=m.y*600,h=s.h[p];
-  if(s.pk){const i=Math.floor((x-130)/90);if(y>270&&y<320&&i>=0&&i<4){s.c='rygb'[i];s.pk=0;nx(s)}return}
-  if(x>170&&x<230&&y>140&&y<224){h.push(dr());nx(s);return}
-  const i=Math.floor((y-360)/78)*11+Math.floor(x/54),q=h[i];if(y<360||!q||!ok(s,q))return;
-  h.splice(i,1);s.t=q;if(!h.length){s.w=p;return}if(q[0]=='k'){s.pk=1;return}
-  s.c=q[0];const v=q[1],n=s.h.length;
-  if(v=='S')nx(s,2);else if(v=='+'){s.h[((s.u+s.d)%n+n)%n].push(dr(),dr());nx(s,2)}else if(v=='R'){s.d*=-1;nx(s,n==2?2:1)}else nx(s)},
+  if(s.pk){const i=Math.floor((x-130)/90);if(y>270&&y<320&&i>=0&&i<4){s.c='rygb'[i];s.pk=0;lg(s,p,'% chose '+['red','yellow','green','blue'][i]);nx(s)}return}
+  if(x>170&&x<230&&y>140&&y<224){h.push(dr());lg(s,p,'% drew a card');nx(s);return}
+  const[st,x0]=hx(h.length),i=y>=400&&y<=530&&x>=x0&&x<=x0+(h.length-1)*st+70?st?Math.min(h.length-1,Math.floor((x-x0)/st)):0:-1,q=h[i];if(!q||!ok(s,q))return;
+  h.splice(i,1);s.t=q;s.pl.push([q,(Math.random()-.5)*.7]);if(s.pl.length>6)s.pl.shift();lg(s,p,'% played '+nm(q));
+  if(!h.length){s.w=p;return}if(h.length==1)lg(s,p,'% has one card left!');if(q[0]=='k'){s.pk=1;return}
+  s.c=q[0];const v=q[1],n=s.h.length,vi=((s.u+s.d)%n+n)%n;
+  if(v=='S'){lg(s,vi,'Skip! (%)');nx(s,2)}else if(v=='+'){s.h[vi].push(dr(),dr());lg(s,vi,'Draw 2! (%)');nx(s,2)}else if(v=='R'){s.d*=-1;lg(s,-1,'Direction reversed');nx(s,n==2?2:1)}else nx(s)},
  ai(s){if(s.u!=1||s.w!=null)return;const h=s.h[1];
   if(s.pk){const n=[...'rygb'].map(k=>h.filter(q=>q[0]==k).length);return this.act(s,1,ck(170+n.indexOf(Math.max(...n))*90,295))}
   let i=h.findIndex(q=>q[0]!='k'&&ok(s,q));if(i<0)i=h.findIndex(q=>ok(s,q));
-  this.act(s,1,i<0?ck(200,180):ck(28+i%11*54,395+(i/11|0)*78))},
+  const[st,x0]=hx(h.length);this.act(s,1,i<0?ck(200,180):ck(x0+i*st+(st?st/2:35),470))},
  draw(s,me){s.h.forEach((h,i)=>T((s.u==i?'> ':'')+(i==me?'You':'P'+(i+1))+': '+h.length,75+i*150,30,20));
-  R(170,140,60,84,'#555');T('DRAW',200,182,16);card(270,140,s.c+s.t[1],1);
+  for(let i=0;i<3;i++){R(170+i*2,140-i*2,60,84,'#ddd');R(172+i*2,142-i*2,56,80,'#444')}T('DRAW',201,182,14);
+  s.pl.forEach(([q,a],k)=>{c.save();c.translate(300,182);c.rotate(a);card(-30,-42,k==s.pl.length-1&&q[0]=='k'?s.c+q[1]:q,60);c.restore()});
   if(s.pk&&s.u==me){T('Pick a color',300,250,20);[...'rygb'].forEach((k,i)=>R(130+i*90,270,80,50,CC[k]))}
   else T(s.u==me?'Your turn':'',300,290,20);
-  s.h[me].forEach((q,i)=>{const x=3+i%11*54,y=360+(i/11|0)*78;card(x,y,q);if(s.u==me&&ok(s,q))R(x,y+72,50,3,'#fff')})}},
+  const h=s.h[me],[st,x0]=hx(h.length);h.forEach((q,i)=>card(x0+i*st,s.u==me&&s.w==null&&ok(s,q)?415:430,q,70))}},
 
 c4:{n:'Connect 4',min:2,max:2,tie:1,
  init:()=>({b:Array(42).fill(0),t:0,w:null}),
@@ -199,8 +215,8 @@ gomoku:{n:'Gomoku',min:2,max:2,tie:1,
 reversi:{n:'Reversi',min:2,max:2,tie:1,
  init:()=>{const b=Array(64).fill(0);b[27]=b[36]=1;b[28]=b[35]=2;return{b,t:0,w:null}},
  act(s,p,m){if(m.d!==1||m.x==null||p!=s.t||s.w!=null)return;const X=Math.floor((m.x*600-20)/70),Y=Math.floor((m.y*600-20)/70);if(X<0||X>7||Y<0||Y>7)return;
-  const i=Y*8+X,f=fl(s.b,i,p+1);if(!f.length)return;s.b[i]=p+1;f.forEach(j=>s.b[j]=p+1);
-  if(mvs(s.b,2-p))s.t=1-p;else if(!mvs(s.b,p+1)){const a=s.b.filter(v=>v==1).length,e=s.b.filter(v=>v==2).length;s.w=a>e?0:e>a?1:2}},
+  const i=Y*8+X,f=fl(s.b,i,p+1);if(!f.length)return;s.b[i]=p+1;f.forEach(j=>s.b[j]=p+1);lg(s,p,'% flipped '+f.length+(f.length>1?' discs':' disc'));
+  if(mvs(s.b,2-p))s.t=1-p;else if(!mvs(s.b,p+1)){const a=s.b.filter(v=>v==1).length,e=s.b.filter(v=>v==2).length;s.w=a>e?0:e>a?1:2}else lg(s,1-p,'% must pass')},
  ai(s){if(s.t!=1||s.w!=null)return;let bi,bs=-1;s.b.forEach((_,i)=>{const n=fl(s.b,i,2).length;if(n){const v=n+([0,7,56,63].includes(i)?10:0)+Math.random();if(v>bs){bs=v;bi=i}}});this.act(s,1,ck(55+bi%8*70,55+(bi>>3)*70))},
  draw(s,me){for(let i=0;i<64;i++){const px=20+i%8*70,py=20+(i>>3)*70,v=s.b[i];R(px,py,70,70,(i%8+(i>>3))%2?'#555':'#666');
    if(v)O(px+35,py+35,28,['','#fff','#111'][v]);else if(s.t==me&&s.w==null&&fl(s.b,i,me+1).length)O(px+35,py+35,6,'#999')}
@@ -226,7 +242,7 @@ snake:{n:'Snake',min:1,max:2,tie:1,
 rps:{n:'Rock Paper Scissors',min:2,max:2,
  init:()=>({c:[-1,-1],sc:[0,0],l:null,t:1,w:null}), // t:1 lets the AI answer on its delay
  act(s,p,m){if(m.d!==1||m.x==null||s.w!=null||s.c[p]>=0)return;const i=Math.floor((m.x*600-30)/190);if(m.y<.5||m.y>.7||i<0||i>2||(m.x*600-30)%190>170)return;s.c[p]=i;
-  if(s.c[0]>=0&&s.c[1]>=0){const d=(s.c[0]-s.c[1]+3)%3;s.l=s.c;if(d)s.sc[d==1?0:1]++;s.c=[-1,-1];if(s.sc[0]>2)s.w=0;else if(s.sc[1]>2)s.w=1}},
+  if(s.c[0]>=0&&s.c[1]>=0){const d=(s.c[0]-s.c[1]+3)%3;s.l=s.c;if(d)s.sc[d==1?0:1]++;lg(s,d==1?0:1,d?'% won the round':'Round tied');s.c=[-1,-1];if(s.sc[0]>2)s.w=0;else if(s.sc[1]>2)s.w=1}},
  ai(s){if(s.c[1]<0&&s.w==null)this.act(s,1,ck(115+(Math.random()*3|0)*190,360))},
  draw(s,me){const N=['Rock','Paper','Scissors'];T(s.sc[me]+'  -  '+s.sc[1-me],300,60,44);T('First to 3',300,100,16,'#888');
   N.forEach((n,i)=>{R(30+i*190,300,170,120,s.c[me]==i?'#888':'#333');T(n,115+i*190,360,22)});
@@ -243,7 +259,7 @@ shooter:{n:'Shooter',min:1,max:4,mv:1,
   s.b.forEach(b=>{b.x+=b.vx*dt;b.y+=b.vy*dt;b.l-=dt});
   if(Math.random()<dt*(.8+s.t/40)*s.p.length){const a=Math.random()*4|0,v=Math.random()*600;s.e.push({x:[v,v,0,600][a],y:[0,600,v,v][a],h:2})}
   s.e.forEach(e=>{let n,dm=1e9;A.forEach(q=>{const d=Math.hypot(q.x-e.x,q.y-e.y);if(d<dm){dm=d;n=q}});if(!n)return;const sp=Math.min(130,60+s.t)*dt;e.x+=(n.x-e.x)/(dm||1)*sp;e.y+=(n.y-e.y)/(dm||1)*sp;
-   if(dm<18){n.h--;e.h=0}
+   if(dm<18){n.h--;e.h=0;if(n.h<=0)lg(s,s.p.indexOf(n),'% went down')}
    s.b.forEach(b=>{if(b.l>0&&e.h>0&&Math.hypot(b.x-e.x,b.y-e.y)<14){e.h--;b.l=0;if(e.h<=0)s.k++}})});
   s.b=s.b.filter(b=>b.l>0&&b.x>0&&b.x<600&&b.y>0&&b.y<600);s.e=s.e.filter(e=>e.h>0);
   if(!s.p.some(q=>q.h>0))s.w=-1},
@@ -255,7 +271,7 @@ checkers:{n:'Checkers',min:2,max:2,tie:1,
  init:()=>({b:Array.from({length:64},(_,i)=>{const x=i%8,y=i>>3;return(x+y)%2?y<3?2:y>4?1:0:0}),t:0,s:-1,m:-1,w:null}),
  act(s,p,m){if(m.d!==1||m.x==null||s.w!=null||p!=s.t)return;let X=Math.floor((m.x*600-20)/70),Y=Math.floor((m.y*600-20)/70);if(X<0||X>7||Y<0||Y>7)return;if(p){X=7-X;Y=7-Y}
   const i=Y*8+X,b=s.b,L=leg(s,p),mo=L.find(a=>a[0]==s.s&&a[1]==i);
-  if(mo){let v=b[s.s];b[s.s]=0;if(mo[2]>=0)b[mo[2]]=0;const pr=v<3&&(p?i>55:i<8);if(pr)v+=2;b[i]=v;
+  if(mo){let v=b[s.s];b[s.s]=0;if(mo[2]>=0)b[mo[2]]=0;const pr=v<3&&(p?i>55:i<8);if(pr){v+=2;lg(s,p,'% got a king')}if(mo[2]>=0)lg(s,p,'% captured a piece');b[i]=v;
    if(mo[2]>=0&&!pr&&(s.m=i,leg(s,p).some(a=>a[2]>=0)))s.s=i;
    else{s.m=-1;s.s=-1;s.t=1-p;if(!leg(s,1-p).length)s.w=p}}
   else if(s.m<0)s.s=b[i]&&(b[i]-1)%2==p&&L.some(a=>a[0]==i)?i:-1},
@@ -297,7 +313,7 @@ memory:{n:'Memory',min:2,max:2,tie:1,
  init:()=>({c:[0,1,2,3,4,5,6,7,0,1,2,3,4,5,6,7].sort(()=>Math.random()-.5),m:Array(16).fill(0),f:[],sn:[],h:0,t:0,sc:[0,0],w:null}),
  act(s,p,m){if(m.d!==1||m.x==null||p!=s.t||s.h>0||s.w!=null)return;const X=Math.floor((m.x*600-30)/135),Y=Math.floor((m.y*600-45)/135),i=Y*4+X;
   if(X<0||X>3||Y<0||Y>3||s.m[i]||s.f.includes(i))return;s.f.push(i);s.sn.push(i);
-  if(s.f.length==2){const[a,b]=s.f;if(s.c[a]==s.c[b]){s.m[a]=s.m[b]=1;s.sc[p]++;s.f=[];if(s.m.every(v=>v)){const[x,y]=s.sc;s.w=x>y?0:y>x?1:2}}else s.h=1}},
+  if(s.f.length==2){const[a,b]=s.f;if(s.c[a]==s.c[b]){s.m[a]=s.m[b]=1;s.sc[p]++;lg(s,p,'% found a match!');s.f=[];if(s.m.every(v=>v)){const[x,y]=s.sc;s.w=x>y?0:y>x?1:2}}else s.h=1}},
  tick(s,dt){if(s.h>0){s.h-=dt;if(s.h<=0){s.f=[];s.t=1-s.t}}},
  ai(s){if(s.t!=1||s.h>0||s.w!=null)return;const fr=[...s.c.keys()].filter(i=>!s.m[i]&&!s.f.includes(i));let i;
   if(s.f.length){const k=fr.find(j=>s.sn.includes(j)&&s.c[j]==s.c[s.f[0]]);i=k!=null&&Math.random()<.8?k:fr[Math.random()*fr.length|0]}
@@ -313,17 +329,19 @@ let g,S,me,cn,peer,iv,code,started,bot,bt=0,conns=[];
 function confetti(){const f=$('cf'),x=f.getContext('2d'),W=f.width=innerWidth,H=f.height=innerHeight,t0=Date.now();f.hidden=false;
  const ps=Array.from({length:150},()=>({x:Math.random()*W,y:-Math.random()*H,v:3+Math.random()*4,a:Math.random()*6,s:5+Math.random()*6,c:`hsl(${Math.random()*360},80%,60%)`}));
  (function z(){x.clearRect(0,0,W,H);ps.forEach(p=>{p.y+=p.v;p.a+=.1;p.x+=Math.sin(p.a);x.fillStyle=p.c;x.fillRect(p.x,p.y,p.s,p.s*.6)});if(Date.now()-t0<4000)requestAnimationFrame(z);else f.hidden=true})()}
-let shown='',np,want=new Set;
+let seen=0,shown='',np,want=new Set;
 const popup=(t,x='')=>{PU.innerHTML=t+x+'<br><button onclick="rm()">Rematch</button><button onclick="PU.hidden=1">Close</button>';PU.hidden=false};
 const ask=l=>{if(shown)popup(shown,l.includes(me)?'<p>Waiting for opponent...</p>':l.length?'<p>Opponent wants a rematch</p>':'')};
+const toast=t=>{const d=document.createElement('div');d.textContent=t;$('ts').append(d);setTimeout(()=>d.remove(),3500)};
 const draw=()=>{if(!S)return;R(0,0,600,600,'#111');g.draw(S,me);
+ if((S.ln||0)<seen)seen=0;const n=(S.h||S.p||[]).length;(S.lg||[]).forEach(([k,p,t])=>{if(k>seen){seen=k;toast(t.replace('%',p==me?'You':n>2?'P'+(p+1):'Opponent'))}});
  const t=S.w==null?'':g.res?g.res(S,me):S.w==2&&g.tie?'Draw':S.w==me?'You win!':g.k=='cards'?'P'+(S.w+1)+' wins':'You lose';
  if(t!=shown){shown=t;if(t)popup(t);if(t=='You win!')confetti()}};
 function rem(p){want.add(p);if(want.size>=(bot?1:np)){want=new Set;S=g.init(np);shown='';PU.hidden=true;conns.forEach(c=>c.send({rs:1}))}else{const l=[...want];ask(l);conns.forEach(c=>c.send({rq:l}))}}
 const rm=()=>cn?cn.send({rm:1}):rem(0);
 const show=h=>{P.innerHTML=h;P.hidden=false};
 const send=m=>cn?cn.send(m):S&&g.act(S,0,m);
-function leave(){clearInterval(iv);const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;shown='';want=new Set;PU.hidden=true;cv.style.display='none';$('clock').hidden=$('aw').hidden=false}
+function leave(){clearInterval(iv);const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;seen=0;$('ts').innerHTML='';shown='';want=new Set;PU.hidden=true;cv.style.display='none';$('clock').hidden=$('aw').hidden=false}
 function menu(){leave();show('<h2>Games</h2>'+Object.values(G).map(v=>`<button onclick="pick('${v.k}')">${v.n}</button>`).join('<br>')+'<h3>Join a lobby</h3><input id=cd placeholder=CODE maxlength=4 size=6><button onclick=join()>Join</button><br><br><button onclick="P.hidden=1">Close</button>')}
 function pick(k){g=G[k];show(`<h2>${g.n}</h2>`+(g.min<2?'<button onclick=go(1)>Solo</button><br>':'')+(g.ai?'<button onclick=go(2,1)>Play vs AI</button><br>':'')+'<button onclick=host()>Create lobby</button><br><br><button onclick=menu()>Back</button>')}
 function lob(){const n=conns.length+1;show(`<h2>${g.n}</h2><p>Lobby code</p><h1>${code}</h1><p>Players: ${n}</p>`+(n>=g.min?'<button onclick="go(conns.length+1)">Start</button>':'<p>Waiting for players...</p>')+'<br><button onclick=menu()>Leave</button>');conns.forEach(c=>c.send({l:n}))}
@@ -341,7 +359,7 @@ function join(){code=$('cd').value.trim().toUpperCase();leave();const p=peer=new
   c.on('data',m=>{if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.rq)ask(m.rq);if(m.rs){shown='';PU.hidden=true}if(m.s){S=m.s;draw()}});
   c.on('close',()=>{if(peer==p){alert('Disconnected');menu()}})})}
 function go(n,b){started=1;bot=b;np=n;S=g.init(n);me=0;conns.forEach((c,i)=>c.send({g:g.k,me:i+1}));begin()}
-function begin(){P.hidden=true;cv.style.display='block';$('clock').hidden=$('aw').hidden=true;if(!cn)iv=setInterval(()=>{if(bot){const a=S.u??S.t;if(g.mv)g.ai(S);else if(a!=1)bt=0;else if((bt+=1/30)>.9){bt=0;g.ai(S)}}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}));draw()},33)}
+function begin(){seen=0;P.hidden=true;cv.style.display='block';$('clock').hidden=$('aw').hidden=true;if(!cn)iv=setInterval(()=>{if(bot){const a=S.u??S.t;if(g.mv)g.ai(S);else if(a!=1)bt=0;else if((bt+=1/30)>.9){bt=0;g.ai(S)}}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}));draw()},33)}
 
 // input
 onkeydown=onkeyup=e=>{if(!S||cv.style.display!='block'||e.repeat)return;send({k:e.key.replace(/^.$/,x=>x.toLowerCase()),d:+(e.type=='keydown')});if(e.key[0]=='A'||e.key==' ')e.preventDefault()};
