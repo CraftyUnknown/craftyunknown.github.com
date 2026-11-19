@@ -532,44 +532,47 @@ function chatT(){const h=$('ch').hidden=!$('ch').hidden;if(h)$('cx').blur();else
 function chat(p,t){const o={n:p,cm:String(t).slice(0,200)};conns.forEach(c=>c.send({ch:o}));addMsg(o)}
 function chatS(){const t=$('cx').value.trim();$('cx').value='';if(t)cn?cn.send({cm:t}):chat(0,t);return false}
 setInterval(()=>{$('cb').hidden=!(cn||conns.length)},400);
-function host(n=0,i=0){const k=g;leave();g=k;wait('Creating lobby...','Connecting to multiplayer server '+(i+1)+'/'+SV.length+' ('+svn(i)+')'+(n?' - retry':i?' - previous server unreachable':'')+'...');code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const p=peer=mkp(i,'cuhub-'+code);lbc(p);
- p.on('error',e=>{if(peer!=p)return;if(e.type=='unavailable-id')host(n,i);else if(bad(e)&&i<SV.length-1)host(n,i+1);else if(bad(e)&&n<1)setTimeout(()=>{if(peer==p)host(n+1,0)},1200);else hostN()});
- p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
- p.on('open',()=>{st('Server connected. Opening lobby...');lob()});
- p.on('connection',c=>acc(c,p))}
+function host(){const k=g;leave();g=k;code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');
+ const H=peer={a:'connecting...',b:'checking...',ab:new AbortController(),destroy(){H.ab.abort();H.pj&&H.pj.destroy();pcs.forEach(x=>x.close())}};lbc(H);hs(H);hp(H,0,0);hn(H)}
+// a lobby listens on every transport at once (PeerJS server + ntfy.sh relay + this device), so players using different ones can still join
+const hs=H=>{if(peer==H&&!H.rd)wait('Creating lobby...','Multiplayer server: '+H.a+'\nBackup relay (ntfy.sh): '+H.b)};
+const hr=H=>{if(peer==H&&!H.rd&&!started){H.rd=1;lob()}};
+const hk=H=>{if(peer==H&&H.pjF&&H.nF&&!H.rd)fail('no server reachable')};
+function hp(H,n,i){if(peer!=H)return;H.a='connecting to server '+(i+1)+'/'+SV.length+' ('+svn(i)+')'+(n?' - retry':'')+'...';hs(H);H.pj&&H.pj.destroy();const p=H.pj=mkp(i,'cuhub-'+code);
+ p.on('error',e=>{if(peer!=H||H.pj!=p)return;if(e.type=='unavailable-id')return host();if(bad(e)&&i<SV.length-1)hp(H,n,i+1);else if(bad(e)&&n<1)setTimeout(()=>hp(H,1,0),1200);else{H.pjF=1;H.a='unreachable';hs(H);hk(H)}});
+ p.on('disconnected',()=>{if(peer==H&&H.pj==p&&H.a=='connected'&&!p.destroyed)p.reconnect()});
+ p.on('open',()=>{if(peer!=H||H.pj!=p)return;H.a='connected';hr(H)});p.on('connection',c=>acc(c,H))}
+function hn(H){const T='cuhub-'+code,w={};nok().then(()=>{if(peer!=H)return;H.b='connected';hr(H);
+ nsub(T,async m=>{if(m.t=='join'&&!started&&conns.length+1<g.max&&!w[m.id]){const pc=w[m.id]=new RTCPeerConnection(ICE.config);pcs.push(pc);acc(new DCc(pc.createDataChannel('g')),H);toast('A player is joining...');await pc.setLocalDescription(await pc.createOffer());await gathered(pc);npub(T,{t:'offer',to:m.id,s:pc.localDescription.sdp})}
+  else if(m.t=='answer'&&w[m.from]&&!w[m.from].remoteDescription)w[m.from].setRemoteDescription({type:'answer',sdp:m.s})},H.ab)},()=>{if(peer!=H)return;H.nF=1;H.b='unreachable';hs(H);hk(H)})}
 function acc(c,p){c.on('open',()=>{if(started||conns.length>=g.max-1)return c.close();conns.push(c);c.send({ix:conns.length});lob()});
  c.on('data',m=>m.rm?rem(conns.indexOf(c)+1):m.cm?chat(conns.indexOf(c)+1,m.cm):S&&g.act(S,conns.indexOf(c)+1,m));
  c.on('close',()=>{if(peer==p&&!started){conns=conns.filter(x=>x!=c);lob()}})}
 function cli(c,p){c.on('open',()=>show(`<h2>Lobby ${code}</h2><p id=n>Connected</p><button onclick=menu()>Leave</button>`));
  c.on('data',m=>{if(m.ix!=null)ci=m.ix;if(m.ch)addMsg(m.ch);if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.rq)ask(m.rq);if(m.rs){rst();shown='';PU.hidden=true}if(m.s)S=m.s});
  c.on('close',()=>{if(peer==p){alert('Disconnected');menu()}})}
-async function join(n=0,cd,i=0){code=cd||$('cd').value.trim().toUpperCase();leave();const my=jn;
- wait('Connecting...',n||i?'Looking for lobby '+code+' on server '+(i+1)+'/'+SV.length+' ('+svn(i)+')'+(n?' - retry':'')+'...':'Checking this device for lobby '+code+'...');
- if(!n&&!i){if(await jl())return;if(jn!=my)return;st('Looking for lobby '+code+' on server 1/'+SV.length+' ('+svn(0)+')...')}
- const p=peer=mkp(i);
- setTimeout(()=>{if(peer==p&&!started&&!$('n')){alert('Could not connect to that lobby. Check the code and try again.');menu()}},20000);
- p.on('error',e=>{if(peer!=p)return;const nx=e.type=='peer-unavailable'||bad(e);if(nx&&i<SV.length-1)join(n,code,i+1);else if(bad(e)&&n<1)setTimeout(()=>{if(peer==p)join(n+1,code,0)},1200);else joinN(code)});
- p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
- p.on('open',()=>{st('Server connected. Contacting the host...');cli(cn=p.connect('cuhub-'+code),p)})}
 // ---- backup signaling over ntfy.sh (HTTPS only): same 4-letter codes, used automatically when PeerJS servers are unreachable ----
 const npub=(t,o)=>fetch(NT+t,{method:'POST',body:JSON.stringify(o)}).catch(()=>{});
 async function nsub(t,fn,ab){const seen=new Set();while(!ab.signal.aborted){try{const r=await fetch(NT+t+'/json?since='+(Math.floor(Date.now()/1000)-5),{signal:ab.signal}),rd=r.body.getReader(),d=new TextDecoder();let b='';
   for(;;){const{done,value}=await rd.read();if(done)break;b+=d.decode(value,{stream:true});let i;while((i=b.indexOf('\n'))>=0){const l=b.slice(0,i);b=b.slice(i+1);try{const e=JSON.parse(l);if(e.event=='message'&&!seen.has(e.id)){seen.add(e.id);fn(JSON.parse(e.message))}}catch(x){}}}}catch(e){if(ab.signal.aborted)return}await new Promise(r=>setTimeout(r,1500))}}
 const nok=()=>fetch(NT+'v1/health',{signal:AbortSignal.timeout(8000)});
-async function hostN(){const k=g;leave();g=k;wait('Creating lobby...','Multiplayer servers unreachable. Trying backup relay (ntfy.sh)...');
- code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const T='cuhub-'+code,ab=new AbortController(),w={},p=peer={destroy(){ab.abort();pcs.forEach(x=>x.close())}};lbc(p);
- try{await nok()}catch(e){return fail('no server reachable')}
- st('Backup relay connected. Opening lobby...');
- nsub(T,async m=>{if(m.t=='join'&&!started&&conns.length+1<g.max&&!w[m.id]){const pc=w[m.id]=new RTCPeerConnection(ICE.config);pcs.push(pc);acc(new DCc(pc.createDataChannel('g')),p);toast('A player is joining...');await pc.setLocalDescription(await pc.createOffer());await gathered(pc);npub(T,{t:'offer',to:m.id,s:pc.localDescription.sdp})}
-  else if(m.t=='answer'&&w[m.from]&&!w[m.from].remoteDescription)w[m.from].setRemoteDescription({type:'answer',sdp:m.s})},ab);
- lob()}
-async function joinN(cd){code=cd;leave();wait('Connecting...','Servers unreachable or lobby not found there. Trying backup relay (ntfy.sh)...');
- try{await nok()}catch(e){return fail('no server reachable')}
- st('Backup relay connected. Waiting for the host to answer...');
- const T='cuhub-'+code,id=Math.random().toString(36).slice(2),ab=new AbortController();let pc;const p=peer={destroy(){ab.abort();pc&&pc.close()}};
- setTimeout(()=>{if(peer==p&&!cn){alert('Lobby not found');menu()}},15000);
- nsub(T,async m=>{if(m.t=='offer'&&m.to==id&&!pc){st('Host answered. Connecting directly to the host...');pc=new RTCPeerConnection(ICE.config);pcs.push(pc);pc.ondatachannel=e=>cli(cn=new DCc(e.channel),p);await pc.setRemoteDescription({type:'offer',sdp:m.s});await pc.setLocalDescription(await pc.createAnswer());await gathered(pc);npub(T,{t:'answer',from:id,s:pc.localDescription.sdp})}},ab);
- npub(T,{t:'join',id})}
+async function join(cd){code=(cd||$('cd').value).trim().toUpperCase();leave();const my=jn;wait('Connecting...','Checking this device for lobby '+code+'...');
+ if(await jl()||jn!=my)return;
+ const J=peer={a:'connecting...',b:'checking...',ab:new AbortController(),destroy(){J.ab.abort();J.pj&&J.pj.destroy();pcs.forEach(x=>x.close())}};
+ js(J);jp(J,0,0);jx(J);
+ setTimeout(()=>{if(peer==J&&!cn){if(J.up){alert('Lobby not found. Check the code and try again.');menu()}else fail('no server reachable')}},22000)}
+const js=J=>{if(peer==J&&!cn)wait('Connecting...','Lobby '+code+'\nMultiplayer server: '+J.a+'\nBackup relay (ntfy.sh): '+J.b)};
+function jp(J,n,i){if(peer!=J||cn)return;J.a='looking on server '+(i+1)+'/'+SV.length+' ('+svn(i)+')'+(n?' - retry':'')+'...';js(J);J.pj&&J.pj.destroy();const p=J.pj=mkp(i);
+ p.on('error',e=>{if(peer!=J||J.pj!=p)return;if(e.type=='peer-unavailable'){J.up=1;if(cn==J.pc)cn=null}else if(cn)return;
+  if((e.type=='peer-unavailable'||bad(e))&&i<SV.length-1)jp(J,n,i+1);else if(bad(e)&&n<1)setTimeout(()=>jp(J,1,0),1200);else{J.a=e.type=='peer-unavailable'?'lobby not found':'unreachable';js(J)}});
+ p.on('disconnected',()=>{if(peer==J&&J.pj==p&&J.a[0]=='c'&&!p.destroyed&&!cn)p.reconnect()});
+ p.on('open',()=>{if(peer!=J||J.pj!=p||cn)return;J.up=1;J.a='connected, contacting host...';js(J);const c=J.pc=p.connect('cuhub-'+code);cli(cn=c,J);c.on('open',()=>J.ab.abort())})}
+function jx(J){const T='cuhub-'+code,id=Math.random().toString(36).slice(2);let pc;
+ nok().then(()=>{if(peer!=J)return;J.up=1;J.b='waiting for host...';js(J);
+  nsub(T,async m=>{if(m.t=='offer'&&m.to==id&&!pc){J.b='host answered, connecting directly...';js(J);pc=new RTCPeerConnection(ICE.config);pcs.push(pc);
+   pc.ondatachannel=e=>{if(peer!=J||(cn&&cn.open!==false))return pc.close();if(cn)J.pc.close();cli(cn=new DCc(e.channel),J);J.ab.abort();J.pj&&J.pj.destroy()};
+   await pc.setRemoteDescription({type:'offer',sdp:m.s});await pc.setLocalDescription(await pc.createAnswer());await gathered(pc);npub(T,{t:'answer',from:id,s:pc.localDescription.sdp})}},J.ab);
+  npub(T,{t:'join',id})},()=>{if(peer!=J)return;J.b='unreachable';js(J)})}
 // ---- direct (serverless) connect: players swap two codes by hand (chat/message), no signaling server needed ----
 let direct=0,pcs=[],pend=null;
 class DCc{constructor(dc){this.dc=dc;this.h={};dc.onopen=()=>this.h.open&&this.h.open();dc.onmessage=e=>this.h.data&&this.h.data(JSON.parse(e.data));dc.onclose=()=>this.h.close&&this.h.close();if(dc.readyState=='open')setTimeout(()=>this.h.open&&this.h.open())}
