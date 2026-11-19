@@ -12,14 +12,15 @@ button{cursor:pointer}
 #p .hw{max-width:420px;margin:12px auto;padding:0 16px;line-height:1.5}
 #cf{position:fixed;inset:0;pointer-events:none;z-index:5}
 #pop{position:fixed;top:30%;left:50%;transform:translateX(-50%);z-index:4;background:#222;border:1px solid #888;padding:24px 40px;font-size:32px;text-align:center}
-#m{position:fixed;top:8px;left:8px;z-index:3;font-size:20px}
+#m,#pz{position:fixed;top:8px;left:8px;z-index:3;font-size:20px}
+#pz{left:64px}
 #clock{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;font:14vw monospace}
 #an{width:min(50vh,70vw)}
 #aw{position:fixed;bottom:16px;width:100%;text-align:center;color:#888}
 #p{position:fixed;inset:0;z-index:2;background:#111;overflow:auto;text-align:center;padding-top:56px}
 #cv{display:none;position:fixed;inset:0;margin:auto;z-index:1;width:min(100vw,100vh);height:min(100vw,100vh);touch-action:none}
 </style></head><body>
-<button id="m" onclick="menu()">☰</button>
+<button id="m" onclick="menu()">☰</button><button id="pz" onclick="pause()" hidden>⏸</button>
 <div id="clock"><svg id="an" viewBox="-50 -50 100 100" stroke="#eee" stroke-linecap="round">
 <circle r="47" fill="none" stroke-width="1"/><g id="nm" stroke="none" fill="#eee" font-size="7" text-anchor="middle" dominant-baseline="central"></g>
 <line id="hh" y2="-22" stroke-width="3"/><line id="mm" y2="-32" stroke-width="2"/><line id="ss" y2="-36" stroke="#888" stroke-width="1"/></svg><div id="dg"></div></div>
@@ -451,8 +452,12 @@ const draw=()=>{if(!S)return;R(0,0,600,600,'#111');c.lineWidth=1;g.draw(S,me);
 function rem(p){want.add(p);if(want.size>=(bot?1:np)){want=new Set;S=g.init(np,bot,S);shown='';PU.hidden=true;conns.forEach(c=>c.send({rs:1}))}else{const l=[...want];ask(l);conns.forEach(c=>c.send({rq:l}))}}
 const rm=()=>cn?cn.send({rm:1}):rem(0);
 const show=h=>{P.innerHTML=h;P.hidden=false};
-const send=m=>cn?cn.send(m):S&&g.act(S,0,m);
-function leave(){clearInterval(iv);const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;seen=0;$('ts').innerHTML='';shown='';want=new Set;PU.hidden=true;cv.style.display='none';$('clock').hidden=$('aw').hidden=false}
+let paused=0;
+const send=m=>{if(paused&&m.d)return;cn?cn.send(m):S&&g.act(S,0,m)};
+const solo=()=>S&&!cn&&!conns.length;
+function pause(){if(!solo()||S.w!=null)return;if(paused)return resume();paused=1;clearInterval(iv);PU.innerHTML='Paused<br><button onclick="resume()">Resume</button><button onclick="leave();P.hidden=1">Close</button>';PU.hidden=false}
+function resume(){paused=0;PU.hidden=true;loop()}
+function leave(){clearInterval(iv);paused=0;$('pz').hidden=true;const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;seen=0;$('ts').innerHTML='';shown='';want=new Set;PU.hidden=true;cv.style.display='none';$('clock').hidden=$('aw').hidden=false}
 function menu(){leave();show('<h2>Games</h2>'+Object.values(G).map(v=>`<button onclick="pick('${v.k}')">${v.n}</button>`).join('<br>')+'<h3>Join a lobby</h3><input id=cd placeholder=CODE maxlength=4 size=6><button onclick=join()>Join</button><br><br><button onclick="P.hidden=1">Close</button>')}
 function pick(k){g=G[k];show(`<h2>${g.n}</h2><h3>How to play</h3><p class=hw>${g.how}</p><button onclick=opts()>Got it</button><br><br><button onclick=menu()>Back</button>`)}
 function opts(){show(`<h2>${g.n}</h2>`+(g.min<2?'<button onclick=go(1)>Solo</button><br>':'')+(g.ai?'<button onclick=go(2,1)>Play vs AI</button><br>':'')+'<button onclick=host()>Create lobby</button><br><br><button onclick=menu()>Back</button>')}
@@ -471,9 +476,10 @@ function join(){code=$('cd').value.trim().toUpperCase();leave();const p=peer=new
   c.on('data',m=>{if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.rq)ask(m.rq);if(m.rs){shown='';PU.hidden=true}if(m.s){S=m.s;draw()}});
   c.on('close',()=>{if(peer==p){alert('Disconnected');menu()}})})}
 function go(n,b){started=1;bot=b;np=n;S=g.init(n,b);me=0;conns.forEach((c,i)=>c.send({g:g.k,me:i+1}));begin()}
-function begin(){seen=0;P.hidden=true;cv.style.display='block';$('clock').hidden=$('aw').hidden=true;if(!cn)iv=setInterval(()=>{if(bot){const a=S.u??S.t;if(g.mv)g.ai(S);else if(a!=1)bt=0;else if((bt+=1/30)>.9){bt=0;g.ai(S)}}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}));draw()},33)}
+function begin(){seen=0;P.hidden=true;cv.style.display='block';$('clock').hidden=$('aw').hidden=true;$('pz').hidden=!solo();if(!cn)loop()}
+function loop(){iv=setInterval(()=>{if(bot){const a=S.u??S.t;if(g.mv)g.ai(S);else if(a!=1)bt=0;else if((bt+=1/30)>.9){bt=0;g.ai(S)}}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}));draw()},33)}
 
 // input
-onkeydown=onkeyup=e=>{if(!S||cv.style.display!='block'||e.repeat)return;send({k:e.key.replace(/^.$/,x=>x.toLowerCase()),d:+(e.type=='keydown')});if(e.key[0]=='A'||e.key==' ')e.preventDefault()};
+onkeydown=onkeyup=e=>{if(!S||cv.style.display!='block'||e.repeat)return;if(e.key=='Escape'){e.type=='keydown'&&pause();return}send({k:e.key.replace(/^.$/,x=>x.toLowerCase()),d:+(e.type=='keydown')});if(e.key[0]=='A'||e.key==' ')e.preventDefault()};
 cv.onpointerdown=cv.onpointermove=cv.onpointerup=e=>{if(!S||(e.type=='pointermove'&&!g.mv))return;if(e.type=='pointerdown'&&g.pr){const q=g.pr(S,me);if(q){const v=prompt(q);if(v)send({tx:v});return}}const r=cv.getBoundingClientRect();send({x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,d:e.type=='pointerdown'?1:e.type=='pointerup'?0:2})};
 </script></body></html>
