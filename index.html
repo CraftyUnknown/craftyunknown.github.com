@@ -218,7 +218,7 @@ cards:{n:'Crazy Cards',min:2,max:4,
   s.pl.forEach(([q,a,pp],k)=>{const p=pp==me?tw('pl'+a,300,182,300,520):pp>=0?tw('pl'+a,300,182,75+pp*150,-60):tw('pl'+a,300,182,200,182);c.save();c.translate(p.x,p.y);c.rotate(a);card(-30,-42,k==s.pl.length-1&&q[0]=='k'?s.c+q[1]:q,60);c.restore()});
   if(s.pk&&s.u==me){T('Pick a color',300,250,20);[...'rygb'].forEach((k,i)=>R(130+i*90,270,80,50,CC[k]))}
   else T(s.u==me?'Your turn':'',300,290,20);
-  const h=s.h[me],[st,x0]=hx(h.length),cn2={};h.forEach((q,i)=>{const o=cn2[q]=(cn2[q]??-1)+1,p=tw('h'+q+o,x0+i*st,s.u==me&&s.w==null&&ok(s,q)?415:430,200,182);card(p.x,p.y,q,70)})}},
+  const h=s.h[me],[st,x0]=hx(h.length),cn2={};h.forEach((q,i)=>{const o=cn2[q]=(cn2[q]??-1)+1,p=tw('h'+q+o,x0+i*st,s.u==me&&s.w==null&&ok(s,q)?415:430,200,182);card(p.x,p.y,q,70)});let wy=80;s.h.forEach((h,i)=>{if(i!=me&&h.length>0&&h.length<4&&s.w==null){const n=h.length;if(Math.floor(performance.now()/350)%2==0)T((n==1?'UNO! ':'')+(s.h.length>2?'P'+(i+1):'Opponent')+' has '+n+' card'+(n>1?'s':'')+' left!',300,wy,n==1?38:32,['','#e44','#fb3','#ddd'][n]);wy+=38}})}},
 
 c4:{n:'Connect 4',min:2,max:2,tie:1,
  init:()=>({b:Array(42).fill(0),t:0,w:null}),
