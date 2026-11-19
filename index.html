@@ -6,6 +6,7 @@
 html,body{margin:0;height:100%;background:#111;color:#eee;font:16px sans-serif;overflow:hidden}
 button,input{font:inherit;background:#222;color:#eee;border:1px solid #555;padding:8px 14px;margin:4px}
 button{cursor:pointer}
+[hidden]{display:none!important}
 #m{position:fixed;top:8px;left:8px;z-index:3;font-size:20px}
 #clock{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;font:14vw monospace}
 #an{width:min(50vh,70vw)}
@@ -168,7 +169,7 @@ let g,S,me,cn,peer,iv,code,started,bot,bt=0,conns=[];
 const draw=()=>{if(S){R(0,0,600,600,'#111');g.draw(S,me)}};
 const show=h=>{P.innerHTML=h;P.hidden=false};
 const send=m=>cn?cn.send(m):S&&g.act(S,0,m);
-function leave(){clearInterval(iv);const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;cv.style.display='none'}
+function leave(){clearInterval(iv);const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;cv.style.display='none';$('clock').hidden=$('aw').hidden=false}
 function menu(){leave();show('<h2>Games</h2>'+Object.values(G).map(v=>`<button onclick="pick('${v.k}')">${v.n}</button>`).join('<br>')+'<h3>Join a lobby</h3><input id=cd placeholder=CODE maxlength=4 size=6><button onclick=join()>Join</button><br><br><button onclick="P.hidden=1">Close</button>')}
 function pick(k){g=G[k];show(`<h2>${g.n}</h2>`+(g.min<2?'<button onclick=go(1)>Solo</button><br>':'')+(g.ai?'<button onclick=go(2,1)>Play vs AI</button><br>':'')+'<button onclick=host()>Create lobby</button><br><br><button onclick=menu()>Back</button>')}
 function lob(){const n=conns.length+1;show(`<h2>${g.n}</h2><p>Lobby code</p><h1>${code}</h1><p>Players: ${n}</p>`+(n>=g.min?'<button onclick="go(conns.length+1)">Start</button>':'<p>Waiting for players...</p>')+'<br><button onclick=menu()>Leave</button>');conns.forEach(c=>c.send({l:n}))}
@@ -186,7 +187,7 @@ function join(){code=$('cd').value.trim().toUpperCase();leave();const p=peer=new
   c.on('data',m=>{if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.s){S=m.s;draw()}});
   c.on('close',()=>{if(peer==p){alert('Disconnected');menu()}})})}
 function go(n,b){started=1;bot=b;S=g.init(n);me=0;conns.forEach((c,i)=>c.send({g:g.k,me:i+1}));begin()}
-function begin(){P.hidden=true;cv.style.display='block';if(!cn)iv=setInterval(()=>{if(bot&&(bt+=1/30)>(g.mv?0:.8)){bt=0;g.ai(S)}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}));draw()},33)}
+function begin(){P.hidden=true;cv.style.display='block';$('clock').hidden=$('aw').hidden=true;if(!cn)iv=setInterval(()=>{if(bot&&(bt+=1/30)>(g.mv?0:.8)){bt=0;g.ai(S)}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}));draw()},33)}
 
 // input
 onkeydown=onkeyup=e=>{if(!S||cv.style.display!='block'||e.repeat)return;send({k:e.key.replace(/^.$/,x=>x.toLowerCase()),d:+(e.type=='keydown')});if(e.key[0]=='A'||e.key==' ')e.preventDefault()};
