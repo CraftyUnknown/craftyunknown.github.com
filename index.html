@@ -7,13 +7,16 @@ html,body{margin:0;height:100%;background:#111;color:#eee;font:16px sans-serif;o
 button,input{font:inherit;background:#222;color:#eee;border:1px solid #555;padding:8px 14px;margin:4px}
 button{cursor:pointer}
 #m{position:fixed;top:8px;left:8px;z-index:3;font-size:20px}
-#clock{height:100%;display:flex;align-items:center;justify-content:center;font:16vw monospace}
+#clock{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;font:14vw monospace}
+#an{width:min(50vh,70vw)}
 #aw{position:fixed;bottom:16px;width:100%;text-align:center;color:#888}
 #p{position:fixed;inset:0;z-index:2;background:#111;overflow:auto;text-align:center;padding-top:56px}
 #cv{display:none;position:fixed;inset:0;margin:auto;z-index:1;width:min(100vw,100vh);height:min(100vw,100vh);touch-action:none}
 </style></head><body>
 <button id="m" onclick="menu()">☰</button>
-<div id="clock"></div>
+<div id="clock"><svg id="an" viewBox="-50 -50 100 100" stroke="#eee" stroke-linecap="round">
+<circle r="47" fill="none" stroke-width="1"/><circle r="43" fill="none" stroke-width="4" stroke-dasharray="1 22.04" stroke-dashoffset="9.5"/>
+<line id="hh" y2="-24" stroke-width="3"/><line id="mm" y2="-35" stroke-width="2"/><line id="ss" y2="-40" stroke="#888" stroke-width="1"/></svg><div id="dg"></div></div>
 <label id="aw"><input type="checkbox" id="wl" checked> Keep screen awake</label>
 <div id="p" hidden></div>
 <canvas id="cv" width="600" height="600"></canvas>
@@ -22,7 +25,8 @@ button{cursor:pointer}
 const $=i=>document.getElementById(i),P=$('p'),cv=$('cv'),c=cv.getContext('2d');
 
 // clock + wake lock
-const tick=()=>$('clock').textContent=new Date().toLocaleTimeString([],{hour12:false});
+const hands=[['hh',d=>d.getHours()%12*30+d.getMinutes()/2],['mm',d=>d.getMinutes()*6],['ss',d=>d.getSeconds()*6]];
+const tick=()=>{const d=new Date();$('dg').textContent=d.toLocaleTimeString([],{hour12:false});hands.forEach(([i,f])=>$(i).setAttribute('transform','rotate('+f(d)+')'))};
 tick();setInterval(tick,250);
 let wk;const wake=async()=>{try{if($('wl').checked){if(!wk&&document.visibilityState=='visible'){wk=await navigator.wakeLock.request('screen');wk.onrelease=()=>wk=null}}else if(wk)wk.release()}catch(e){}};
 $('wl').onchange=wake;document.onvisibilitychange=wake;addEventListener('pointerdown',wake);wake();
@@ -31,6 +35,7 @@ $('wl').onchange=wake;document.onvisibilitychange=wake;addEventListener('pointer
 const T=(t,x,y,s=24,col='#eee')=>{c.fillStyle=col;c.font=s+'px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(t,x,y)};
 const R=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h)};
 const O=(x,y,r,col)=>{c.fillStyle=col;c.beginPath();c.arc(x,y,r,0,7);c.fill()};
+const ck=(x,y)=>({d:1,x:x/600,y:y/600});
 const msg=(s,me)=>s.w==null?(s.t==me?'Your turn':"Opponent's turn"):s.w==2?'Draw':s.w==me?'You win!':'You lose';
 const win=(b,W,H,n)=>{for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=b[y*W+x];if(!v)continue;for(const[dx,dy]of[[1,0],[0,1],[1,1],[1,-1]]){let k=1;while(k<n&&x+dx*k>=0&&x+dx*k<W&&y+dy*k>=0&&y+dy*k<H&&b[(y+dy*k)*W+x+dx*k]==v)k++;if(k==n)return v}}return 0};
 
@@ -71,6 +76,7 @@ pong:{n:'Pong',min:2,max:2,mv:1,
   if(b[1]<8||b[1]>592){b[3]*=-1;b[1]=Math.max(8,Math.min(592,b[1]))}
   for(const i of[0,1])if(Math.abs(b[0]-(i?580:20))<18&&Math.abs(b[1]-s.p[i])<55&&(b[2]<0)==!i){b[2]*=-1.05;b[3]=Math.max(-450,Math.min(450,b[3]+(b[1]-s.p[i])*3))}
   if(b[0]<0||b[0]>600){s.sc[b[0]<0?1:0]++;s.b=[300,300,b[0]<0?260:-260,140]}},
+ ai(s){const e=s.b[1]-s.p[1];s.d[1]=s.b[2]>0&&Math.abs(e)>15?Math.sign(e)*.75:0},
  draw(s,me){R(10,s.p[0]-50,10,100,'#eee');R(580,s.p[1]-50,10,100,'#eee');R(s.b[0]-6,s.b[1]-6,12,12,'#eee');T(s.sc[0]+'   '+s.sc[1],300,40,40);T(me?'You: right':'You: left',300,585,16,'#888')}},
 
 race:{n:'Racing',min:1,max:2,
@@ -107,6 +113,10 @@ chess:{n:'Chess',min:2,max:2,
   const i=Y*8+X,b=s.b;
   if(s.s>=0&&mv(b,s.s).includes(i)){const o=b[i];b[i]=b[s.s];b[s.s]='';if(b[i]=='P'&&i<8)b[i]='Q';if(b[i]=='p'&&i>55)b[i]='q';if(o.toLowerCase()=='k')s.w=p;s.t=1-p;s.s=-1}
   else s.s=b[i]&&(b[i]<'a')==!p?i:-1},
+ ai(s){if(s.t!=1||s.w!=null)return;const V={p:1,n:3,b:3,r:5,q:9,k:99};let best,bs=-1e9;
+  s.b.forEach((q,i)=>{if(q<'a')return;mv(s.b,i).forEach(j=>{let v=(V[(s.b[j]||'').toLowerCase()]||0)+Math.random()*.5;const n=[...s.b];n[j]=q;n[i]='';
+   if(n.some((o,k)=>o&&o<'a'&&mv(n,k).includes(j)))v-=V[q];if(v>bs){bs=v;best=[i,j]}})});
+  if(best)best.forEach(i=>this.act(s,1,ck(55+(7-i%8)*70,55+(7-(i>>3))*70)))},
  draw(s,me){const sel=s.s>=0?mv(s.b,s.s):[];
   for(let i=0;i<64;i++){let x=i%8,y=i>>3;if(me){x=7-x;y=7-y}const px=20+x*70,py=20+y*70,q=s.b[i];
    R(px,py,70,70,(i%8+(i>>3))%2?'#777':'#ccc');if(i==s.s)R(px,py,70,70,'#9a6');
@@ -123,6 +133,10 @@ cards:{n:'Crazy Cards',min:2,max:4,
   h.splice(i,1);s.t=q;if(!h.length){s.w=p;return}if(q[0]=='k'){s.pk=1;return}
   s.c=q[0];const v=q[1],n=s.h.length;
   if(v=='S')nx(s,2);else if(v=='+'){s.h[((s.u+s.d)%n+n)%n].push(dr(),dr());nx(s,2)}else if(v=='R'){s.d*=-1;nx(s,n==2?2:1)}else nx(s)},
+ ai(s){if(s.u!=1||s.w!=null)return;const h=s.h[1];
+  if(s.pk){const n=[...'rygb'].map(k=>h.filter(q=>q[0]==k).length);return this.act(s,1,ck(170+n.indexOf(Math.max(...n))*90,295))}
+  let i=h.findIndex(q=>q[0]!='k'&&ok(s,q));if(i<0)i=h.findIndex(q=>ok(s,q));
+  this.act(s,1,i<0?ck(200,180):ck(28+i%11*54,395+(i/11|0)*78))},
  draw(s,me){s.h.forEach((h,i)=>T((s.u==i?'> ':'')+(i==me?'You':'P'+(i+1))+': '+h.length,75+i*150,30,20));
   R(170,140,60,84,'#555');T('DRAW',200,182,16);card(270,140,s.c+s.t[1],1);
   if(s.w!=null)T(s.w==me?'You win!':'P'+(s.w+1)+' wins',300,290,36);
@@ -134,24 +148,29 @@ c4:{n:'Connect 4',min:2,max:2,
  init:()=>({b:Array(42).fill(0),t:0,w:null}),
  act(s,p,m){if(m.d!==1||m.x==null||p!=s.t||s.w!=null)return;const x=Math.floor((m.x*600-20)/80);if(x<0||x>6)return;
   for(let y=5;y>=0;y--)if(!s.b[y*7+x]){s.b[y*7+x]=p+1;const v=win(s.b,7,6,4);s.w=v?v-1:s.b.includes(0)?null:2;s.t=1-p;return}},
+ ai(s){if(s.t!=1||s.w!=null)return;const d=(x,v)=>{for(let y=5;y>=0;y--)if(!s.b[y*7+x]){const n=[...s.b];n[y*7+x]=v;return n}},cs=[0,1,2,3,4,5,6].filter(x=>!s.b[x]);
+  const m=cs.find(x=>win(d(x,2),7,6,4))??cs.find(x=>win(d(x,1),7,6,4))??cs.map(x=>[Math.abs(x-3)+Math.random()*2,x]).sort((a,b)=>a[0]-b[0])[0][1];
+  this.act(s,1,ck(60+m*80,300))},
  draw(s,me){R(20,70,560,480,'#444');s.b.forEach((v,i)=>O(60+i%7*80,110+(i/7|0)*80,32,['#111','#fff','#e44'][v]));T(msg(s,me)+(me?' (red)':' (white)'),300,35,22)}},
 
 ttt:{n:'Tic-tac-toe',min:2,max:2,
  init:()=>({b:Array(9).fill(0),t:0,w:null}),
  act(s,p,m){if(m.d!==1||m.x==null||p!=s.t||s.w!=null)return;const X=Math.floor((m.x*600-30)/180),Y=Math.floor((m.y*600-50)/180),i=Y*3+X;
   if(X<0||X>2||Y<0||Y>2||s.b[i])return;s.b[i]=p+1;const v=win(s.b,3,3,3);s.w=v?v-1:s.b.includes(0)?null:2;s.t=1-p},
+ ai(s){if(s.t!=1||s.w!=null)return;const e=[...s.b.keys()].filter(i=>!s.b[i]),t=(i,v)=>{s.b[i]=v;const w=win(s.b,3,3,3);s.b[i]=0;return w};
+  const m=e.find(i=>t(i,2))??e.find(i=>t(i,1))??(s.b[4]?e[Math.random()*e.length|0]:4);this.act(s,1,ck(120+m%3*180,140+(m/3|0)*180))},
  draw(s,me){s.b.forEach((v,i)=>{const x=30+i%3*180,y=50+(i/3|0)*180;R(x+2,y+2,176,176,'#222');T(['','X','O'][v],x+90,y+95,120)});T(msg(s,me)+(me?' (O)':' (X)'),300,25,22)}}
 };
 Object.entries(G).forEach(([k,v])=>v.k=k);
 
 // ---- framework: host runs the game and broadcasts state; clients send input ----
-let g,S,me,cn,peer,iv,code,started,conns=[];
+let g,S,me,cn,peer,iv,code,started,bot,bt=0,conns=[];
 const draw=()=>{if(S){R(0,0,600,600,'#111');g.draw(S,me)}};
 const show=h=>{P.innerHTML=h;P.hidden=false};
 const send=m=>cn?cn.send(m):S&&g.act(S,0,m);
-function leave(){clearInterval(iv);const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;cv.style.display='none'}
+function leave(){clearInterval(iv);const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;cv.style.display='none'}
 function menu(){leave();show('<h2>Games</h2>'+Object.values(G).map(v=>`<button onclick="pick('${v.k}')">${v.n}</button>`).join('<br>')+'<h3>Join a lobby</h3><input id=cd placeholder=CODE maxlength=4 size=6><button onclick=join()>Join</button><br><br><button onclick="P.hidden=1">Close</button>')}
-function pick(k){g=G[k];show(`<h2>${g.n}</h2>`+(g.min<2?'<button onclick=go(1)>Solo</button><br>':'')+'<button onclick=host()>Create lobby</button><br><br><button onclick=menu()>Back</button>')}
+function pick(k){g=G[k];show(`<h2>${g.n}</h2>`+(g.min<2?'<button onclick=go(1)>Solo</button><br>':'')+(g.ai?'<button onclick=go(2,1)>Play vs AI</button><br>':'')+'<button onclick=host()>Create lobby</button><br><br><button onclick=menu()>Back</button>')}
 function lob(){const n=conns.length+1;show(`<h2>${g.n}</h2><p>Lobby code</p><h1>${code}</h1><p>Players: ${n}</p>`+(n>=g.min?'<button onclick="go(conns.length+1)">Start</button>':'<p>Waiting for players...</p>')+'<br><button onclick=menu()>Leave</button>');conns.forEach(c=>c.send({l:n}))}
 function host(){const k=g;leave();g=k;code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const p=peer=new Peer('cuhub-'+code);
  p.on('error',e=>{if(peer!=p)return;e.type=='unavailable-id'?host():(alert('Network error: '+e.type),menu())});
@@ -166,8 +185,8 @@ function join(){code=$('cd').value.trim().toUpperCase();leave();const p=peer=new
   c.on('open',()=>show(`<h2>Lobby ${code}</h2><p id=n>Connected</p><button onclick=menu()>Leave</button>`));
   c.on('data',m=>{if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.s){S=m.s;draw()}});
   c.on('close',()=>{if(peer==p){alert('Disconnected');menu()}})})}
-function go(n){started=1;S=g.init(n);me=0;conns.forEach((c,i)=>c.send({g:g.k,me:i+1}));begin()}
-function begin(){P.hidden=true;cv.style.display='block';if(!cn)iv=setInterval(()=>{g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}));draw()},33)}
+function go(n,b){started=1;bot=b;S=g.init(n);me=0;conns.forEach((c,i)=>c.send({g:g.k,me:i+1}));begin()}
+function begin(){P.hidden=true;cv.style.display='block';if(!cn)iv=setInterval(()=>{if(bot&&(bt+=1/30)>(g.mv?0:.8)){bt=0;g.ai(S)}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}));draw()},33)}
 
 // input
 onkeydown=onkeyup=e=>{if(!S||cv.style.display!='block'||e.repeat)return;send({k:e.key.replace(/^.$/,x=>x.toLowerCase()),d:+(e.type=='keydown')});if(e.key[0]=='A'||e.key==' ')e.preventDefault()};
