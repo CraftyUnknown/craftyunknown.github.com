@@ -15,6 +15,10 @@ button{cursor:pointer}
 @keyframes sl{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
 #pop{animation:pop .25s ease-out}
 #ts div{animation:sl .25s ease-out}
+#cb{position:fixed;bottom:8px;left:8px;z-index:6}
+#ch{position:fixed;bottom:56px;left:8px;z-index:6;width:min(320px,calc(100vw - 16px));background:#1a1a1a;border:1px solid #555}
+#cl{height:min(40vh,260px);overflow:auto;padding:8px;text-align:left;font-size:14px;word-break:break-word}
+#ch form{display:flex}#ch input{flex:1;min-width:0}
 #cf{position:fixed;inset:0;pointer-events:none;z-index:5}
 #pop{position:fixed;top:30%;left:50%;transform:translateX(-50%);z-index:4;background:#222;border:1px solid #888;padding:24px 40px;font-size:32px;text-align:center}
 #m,#pz{position:fixed;top:8px;left:8px;z-index:3;font-size:20px}
@@ -37,6 +41,8 @@ button{cursor:pointer}
 <div id="p" hidden></div>
 <div id="pop" hidden></div>
 <div id="ts"></div>
+<button id="cb" hidden onclick="chatT()">💬 Chat</button>
+<div id="ch" hidden><div id="cl"></div><form onsubmit="return chatS()"><input id="cx" maxlength="200" placeholder="Message..." autocomplete="off"><button>Send</button></form></div>
 <canvas id="cf" hidden></canvas>
 <canvas id="cv" width="600" height="600"></canvas>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -478,7 +484,7 @@ const solo=()=>S&&!cn&&!conns.length;
 function pause(){if(!solo()||S.w!=null)return;if(paused)return resume();paused=1;clearInterval(iv);PU.innerHTML='Paused<br><button onclick="resume()">Resume</button><button onclick="leave();P.hidden=1">Close</button>';PU.hidden=false}
 function resume(){paused=0;PU.hidden=true;loop()}
 (function f(n){DT=Math.min(.05,(n-LT)/1000);LT=n;if(S&&cv.style.display=='block')draw();requestAnimationFrame(f)})(0);
-function leave(){clearInterval(iv);direct=0;pcs.forEach(x=>x.close());pcs=[];pend=null;paused=0;$('pz').hidden=true;const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;seen=0;$('ts').innerHTML='';shown='';want=new Set;PU.hidden=true;cv.style.display='none';$('clock').hidden=$('aw').hidden=false}
+function leave(){clearInterval(iv);jn++;conns.forEach(c=>c.bye&&c.bye());CL=[];$('cl').innerHTML='';$('ch').hidden=true;$('cb').hidden=true;$('cb').textContent='💬 Chat';unread=0;ci=0;direct=0;pcs.forEach(x=>x.close());pcs=[];pend=null;paused=0;$('pz').hidden=true;const p=peer;peer=cn=null;p&&p.bc&&p.bc.close();p&&p.destroy();conns=[];S=null;started=0;bot=0;seen=0;$('ts').innerHTML='';shown='';want=new Set;PU.hidden=true;cv.style.display='none';$('clock').hidden=$('aw').hidden=false}
 function menu(){leave();show('<h2>Games</h2>'+Object.values(G).map(v=>`<button onclick="pick('${v.k}')">${v.n}</button>`).join('<br>')+'<h3>Join a lobby</h3><input id=cd placeholder=CODE maxlength=4 size=6><button onclick=join()>Join</button><br><button onclick=joinM()>Join without server</button><br><br><button onclick="P.hidden=1">Close</button>')}
 function pick(k){g=G[k];show(`<h2>${g.n}</h2><h3>How to play</h3><p class=hw>${g.how}</p><button onclick=opts()>Got it</button><br><br><button onclick=menu()>Back</button>`)}
 function opts(){show(`<h2>${g.n}</h2>`+(g.min<2?'<button onclick=go(1)>Solo</button><br>':'')+(g.ai?'<button onclick=go(2,1)>Play vs AI</button><br>':'')+'<button onclick=host()>Create lobby</button><br><button onclick=hostM()>Create lobby without server</button><br><br><button onclick=menu()>Back</button>')}
@@ -509,38 +515,60 @@ svc();setInterval(svc,60000);
 const mkp=(i,id)=>new Peer(id,{...ICE,...SV[i]});
 const NET='Could not reach the multiplayer server. Check your connection (or disable ad/tracker blockers) and try again.';
 const bad=e=>['network','server-error','socket-error','socket-closed','disconnected'].includes(e.type);
-function host(n=0,i=0){const k=g;leave();g=k;show('<h2>Creating lobby...</h2><button onclick=menu()>Cancel</button>');code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const p=peer=mkp(i,'cuhub-'+code);
+const svn=i=>SV[i].host||'0.peerjs.com';
+const st=t=>{const e=$('stt');if(e)e.textContent=t};
+const wait=(h,t)=>show(`<h2>${h}</h2><p id=stt class=hw>${t}</p><button onclick=menu()>Cancel</button>`);
+let jn=0,CL=[],ci=0,unread=0;
+// same-browser lobbies: other tabs/windows on this device are reached instantly over a BroadcastChannel (no network)
+class BCc{constructor(bc,id,host){this.bc=bc;this.id=id;this.host=host;this.h={};this.f=e=>{const d=e.data,mine=host?d.from==id:d.to==id;if(!mine)return;if(d.t=='m')this.h.data&&this.h.data(d.m);if(d.t=='bye')this.h.close&&this.h.close()};bc.addEventListener('message',this.f)}
+ on(e,f){this.h[e]=f}send(m){this.bc.postMessage(this.host?{t:'m',to:this.id,m}:{t:'m',from:this.id,m})}bye(){this.bc.postMessage(this.host?{t:'bye',to:this.id}:{t:'bye',from:this.id})}close(){this.bye()}}
+function lbc(p){const bc=p.bc=new BroadcastChannel('cuhub-'+code),seen=new Set();bc.onmessage=e=>{const d=e.data;if(d.t=='join'&&!started&&conns.length+1<g.max&&!seen.has(d.id)){seen.add(d.id);bc.postMessage({t:'ok',to:d.id});const c=new BCc(bc,d.id,1);acc(c,p);setTimeout(()=>c.h.open&&c.h.open())}}}
+const jl=()=>new Promise(res=>{const bc=new BroadcastChannel('cuhub-'+code),id=Math.random().toString(36).slice(2);let ok=0;const t=setTimeout(()=>{bc.close();res(0)},500);
+ bc.onmessage=e=>{const d=e.data;if(d.t=='ok'&&d.to==id&&!ok){ok=1;clearTimeout(t);const p=peer={destroy(){c.bye();bc.close()}},c=cn=new BCc(bc,id,0);cli(c,p);setTimeout(()=>c.h.open&&c.h.open());res(1)}};bc.postMessage({t:'join',id})});
+// lobby chat
+const nmz=n=>n==ci?'You':n==0?'Host':'P'+(n+1);
+function addMsg(o){CL.push(o);const d=document.createElement('div');d.textContent=nmz(o.n)+': '+o.cm;$('cl').append(d);$('cl').scrollTop=1e9;if($('ch').hidden){unread++;$('cb').textContent='💬 Chat ('+unread+')';toast(nmz(o.n)+': '+o.cm)}}
+function chatT(){const h=$('ch').hidden=!$('ch').hidden;if(h)$('cx').blur();else{unread=0;$('cb').textContent='💬 Chat';$('cx').focus()}}
+function chat(p,t){const o={n:p,cm:String(t).slice(0,200)};conns.forEach(c=>c.send({ch:o}));addMsg(o)}
+function chatS(){const t=$('cx').value.trim();$('cx').value='';if(t)cn?cn.send({cm:t}):chat(0,t);return false}
+setInterval(()=>{$('cb').hidden=!(cn||conns.length)},400);
+function host(n=0,i=0){const k=g;leave();g=k;wait('Creating lobby...','Connecting to multiplayer server '+(i+1)+'/'+SV.length+' ('+svn(i)+')'+(n?' - retry':i?' - previous server unreachable':'')+'...');code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const p=peer=mkp(i,'cuhub-'+code);lbc(p);
  p.on('error',e=>{if(peer!=p)return;if(e.type=='unavailable-id')host(n,i);else if(bad(e)&&i<SV.length-1)host(n,i+1);else if(bad(e)&&n<1)setTimeout(()=>{if(peer==p)host(n+1,0)},1200);else hostN()});
  p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
- p.on('open',lob);
+ p.on('open',()=>{st('Server connected. Opening lobby...');lob()});
  p.on('connection',c=>acc(c,p))}
-function acc(c,p){c.on('open',()=>{if(started||conns.length>=g.max-1)return c.close();conns.push(c);lob()});
- c.on('data',m=>m.rm?rem(conns.indexOf(c)+1):S&&g.act(S,conns.indexOf(c)+1,m));
+function acc(c,p){c.on('open',()=>{if(started||conns.length>=g.max-1)return c.close();conns.push(c);c.send({ix:conns.length});lob()});
+ c.on('data',m=>m.rm?rem(conns.indexOf(c)+1):m.cm?chat(conns.indexOf(c)+1,m.cm):S&&g.act(S,conns.indexOf(c)+1,m));
  c.on('close',()=>{if(peer==p&&!started){conns=conns.filter(x=>x!=c);lob()}})}
 function cli(c,p){c.on('open',()=>show(`<h2>Lobby ${code}</h2><p id=n>Connected</p><button onclick=menu()>Leave</button>`));
- c.on('data',m=>{if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.rq)ask(m.rq);if(m.rs){rst();shown='';PU.hidden=true}if(m.s)S=m.s});
+ c.on('data',m=>{if(m.ix!=null)ci=m.ix;if(m.ch)addMsg(m.ch);if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.rq)ask(m.rq);if(m.rs){rst();shown='';PU.hidden=true}if(m.s)S=m.s});
  c.on('close',()=>{if(peer==p){alert('Disconnected');menu()}})}
-function join(n=0,cd,i=0){code=cd||$('cd').value.trim().toUpperCase();leave();show('<h2>Connecting...</h2><button onclick=menu()>Cancel</button>');const p=peer=mkp(i);
+async function join(n=0,cd,i=0){code=cd||$('cd').value.trim().toUpperCase();leave();const my=jn;
+ wait('Connecting...',n||i?'Looking for lobby '+code+' on server '+(i+1)+'/'+SV.length+' ('+svn(i)+')'+(n?' - retry':'')+'...':'Checking this device for lobby '+code+'...');
+ if(!n&&!i){if(await jl())return;if(jn!=my)return;st('Looking for lobby '+code+' on server 1/'+SV.length+' ('+svn(0)+')...')}
+ const p=peer=mkp(i);
  setTimeout(()=>{if(peer==p&&!started&&!$('n')){alert('Could not connect to that lobby. Check the code and try again.');menu()}},20000);
  p.on('error',e=>{if(peer!=p)return;const nx=e.type=='peer-unavailable'||bad(e);if(nx&&i<SV.length-1)join(n,code,i+1);else if(bad(e)&&n<1)setTimeout(()=>{if(peer==p)join(n+1,code,0)},1200);else joinN(code)});
  p.on('disconnected',()=>{if(peer==p&&!p.destroyed)p.reconnect()});
- p.on('open',()=>cli(cn=p.connect('cuhub-'+code),p))}
+ p.on('open',()=>{st('Server connected. Contacting the host...');cli(cn=p.connect('cuhub-'+code),p)})}
 // ---- backup signaling over ntfy.sh (HTTPS only): same 4-letter codes, used automatically when PeerJS servers are unreachable ----
 const npub=(t,o)=>fetch(NT+t,{method:'POST',body:JSON.stringify(o)}).catch(()=>{});
 async function nsub(t,fn,ab){const seen=new Set();while(!ab.signal.aborted){try{const r=await fetch(NT+t+'/json?since='+(Math.floor(Date.now()/1000)-5),{signal:ab.signal}),rd=r.body.getReader(),d=new TextDecoder();let b='';
   for(;;){const{done,value}=await rd.read();if(done)break;b+=d.decode(value,{stream:true});let i;while((i=b.indexOf('\n'))>=0){const l=b.slice(0,i);b=b.slice(i+1);try{const e=JSON.parse(l);if(e.event=='message'&&!seen.has(e.id)){seen.add(e.id);fn(JSON.parse(e.message))}}catch(x){}}}}catch(e){if(ab.signal.aborted)return}await new Promise(r=>setTimeout(r,1500))}}
 const nok=()=>fetch(NT+'v1/health',{signal:AbortSignal.timeout(8000)});
-async function hostN(){const k=g;leave();g=k;show('<h2>Creating lobby...</h2><button onclick=menu()>Cancel</button>');
- code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const T='cuhub-'+code,ab=new AbortController(),w={},p=peer={destroy(){ab.abort();pcs.forEach(x=>x.close())}};
+async function hostN(){const k=g;leave();g=k;wait('Creating lobby...','Multiplayer servers unreachable. Trying backup relay (ntfy.sh)...');
+ code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');const T='cuhub-'+code,ab=new AbortController(),w={},p=peer={destroy(){ab.abort();pcs.forEach(x=>x.close())}};lbc(p);
  try{await nok()}catch(e){return fail('no server reachable')}
- nsub(T,async m=>{if(m.t=='join'&&!started&&conns.length+1<g.max&&!w[m.id]){const pc=w[m.id]=new RTCPeerConnection(ICE.config);pcs.push(pc);acc(new DCc(pc.createDataChannel('g')),p);await pc.setLocalDescription(await pc.createOffer());await gathered(pc);npub(T,{t:'offer',to:m.id,s:pc.localDescription.sdp})}
+ st('Backup relay connected. Opening lobby...');
+ nsub(T,async m=>{if(m.t=='join'&&!started&&conns.length+1<g.max&&!w[m.id]){const pc=w[m.id]=new RTCPeerConnection(ICE.config);pcs.push(pc);acc(new DCc(pc.createDataChannel('g')),p);toast('A player is joining...');await pc.setLocalDescription(await pc.createOffer());await gathered(pc);npub(T,{t:'offer',to:m.id,s:pc.localDescription.sdp})}
   else if(m.t=='answer'&&w[m.from]&&!w[m.from].remoteDescription)w[m.from].setRemoteDescription({type:'answer',sdp:m.s})},ab);
  lob()}
-async function joinN(cd){code=cd;leave();show('<h2>Connecting...</h2><button onclick=menu()>Cancel</button>');
+async function joinN(cd){code=cd;leave();wait('Connecting...','Servers unreachable or lobby not found there. Trying backup relay (ntfy.sh)...');
  try{await nok()}catch(e){return fail('no server reachable')}
+ st('Backup relay connected. Waiting for the host to answer...');
  const T='cuhub-'+code,id=Math.random().toString(36).slice(2),ab=new AbortController();let pc;const p=peer={destroy(){ab.abort();pc&&pc.close()}};
  setTimeout(()=>{if(peer==p&&!cn){alert('Lobby not found');menu()}},15000);
- nsub(T,async m=>{if(m.t=='offer'&&m.to==id&&!pc){pc=new RTCPeerConnection(ICE.config);pcs.push(pc);pc.ondatachannel=e=>cli(cn=new DCc(e.channel),p);await pc.setRemoteDescription({type:'offer',sdp:m.s});await pc.setLocalDescription(await pc.createAnswer());await gathered(pc);npub(T,{t:'answer',from:id,s:pc.localDescription.sdp})}},ab);
+ nsub(T,async m=>{if(m.t=='offer'&&m.to==id&&!pc){st('Host answered. Connecting directly to the host...');pc=new RTCPeerConnection(ICE.config);pcs.push(pc);pc.ondatachannel=e=>cli(cn=new DCc(e.channel),p);await pc.setRemoteDescription({type:'offer',sdp:m.s});await pc.setLocalDescription(await pc.createAnswer());await gathered(pc);npub(T,{t:'answer',from:id,s:pc.localDescription.sdp})}},ab);
  npub(T,{t:'join',id})}
 // ---- direct (serverless) connect: players swap two codes by hand (chat/message), no signaling server needed ----
 let direct=0,pcs=[],pend=null;
@@ -567,6 +595,6 @@ function begin(){rst();seen=0;P.hidden=true;cv.style.display='block';$('clock').
 function loop(){iv=setInterval(()=>{if(bot){const a=S.u??S.t;if(g.mv)g.ai(S);else if(a!=1)bt=0;else if((bt+=1/30)>.9){bt=0;g.ai(S)}}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}))},33)}
 
 // input
-onkeydown=onkeyup=e=>{if(!S||cv.style.display!='block'||e.repeat)return;if(e.key=='Escape'){e.type=='keydown'&&pause();return}send({k:e.key.replace(/^.$/,x=>x.toLowerCase()),d:+(e.type=='keydown')});if(e.key[0]=='A'||e.key==' ')e.preventDefault()};
+onkeydown=onkeyup=e=>{if(e.target.matches&&e.target.matches('input,textarea'))return;if(!S||cv.style.display!='block'||e.repeat)return;if(e.key=='Escape'){e.type=='keydown'&&pause();return}send({k:e.key.replace(/^.$/,x=>x.toLowerCase()),d:+(e.type=='keydown')});if(e.key[0]=='A'||e.key==' ')e.preventDefault()};
 cv.onpointerdown=cv.onpointermove=cv.onpointerup=e=>{if(!S||(e.type=='pointermove'&&!g.mv))return;if(e.type=='pointerdown'&&g.pr){const q=g.pr(S,me);if(q){const v=prompt(q);if(v)send({tx:v});return}}const r=cv.getBoundingClientRect();send({x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,d:e.type=='pointerdown'?1:e.type=='pointerup'?0:2})};
 </script></body></html>
