@@ -167,13 +167,17 @@ Object.entries(G).forEach(([k,v])=>v.k=k);
 
 // ---- framework: host runs the game and broadcasts state; clients send input ----
 let g,S,me,cn,peer,iv,code,started,bot,bt=0,conns=[];
-let shown='';
+let shown='',np,want=new Set;
+const popup=(t,x='')=>{PU.innerHTML=t+x+'<br><button onclick="rm()">Rematch</button><button onclick="PU.hidden=1">Close</button>';PU.hidden=false};
+const ask=l=>{if(shown)popup(shown,l.includes(me)?'<p>Waiting for opponent...</p>':l.length?'<p>Opponent wants a rematch</p>':'')};
 const draw=()=>{if(!S)return;R(0,0,600,600,'#111');g.draw(S,me);
  const t=S.w==null?'':S.w==2&&(g.k=='ttt'||g.k=='c4')?'Draw':S.w==me?'You win!':g.k=='cards'?'P'+(S.w+1)+' wins':'You lose';
- if(t!=shown){shown=t;if(t){PU.innerHTML=t+'<br><button onclick="PU.hidden=1">OK</button>';PU.hidden=false}}};
+ if(t!=shown){shown=t;if(t)popup(t)}};
+function rem(p){want.add(p);if(want.size>=(bot?1:np)){want=new Set;S=g.init(np);shown='';PU.hidden=true;conns.forEach(c=>c.send({rs:1}))}else{const l=[...want];ask(l);conns.forEach(c=>c.send({rq:l}))}}
+const rm=()=>cn?cn.send({rm:1}):rem(0);
 const show=h=>{P.innerHTML=h;P.hidden=false};
 const send=m=>cn?cn.send(m):S&&g.act(S,0,m);
-function leave(){clearInterval(iv);const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;shown='';PU.hidden=true;cv.style.display='none';$('clock').hidden=$('aw').hidden=false}
+function leave(){clearInterval(iv);const p=peer;peer=cn=null;p&&p.destroy();conns=[];S=null;started=0;bot=0;shown='';want=new Set;PU.hidden=true;cv.style.display='none';$('clock').hidden=$('aw').hidden=false}
 function menu(){leave();show('<h2>Games</h2>'+Object.values(G).map(v=>`<button onclick="pick('${v.k}')">${v.n}</button>`).join('<br>')+'<h3>Join a lobby</h3><input id=cd placeholder=CODE maxlength=4 size=6><button onclick=join()>Join</button><br><br><button onclick="P.hidden=1">Close</button>')}
 function pick(k){g=G[k];show(`<h2>${g.n}</h2>`+(g.min<2?'<button onclick=go(1)>Solo</button><br>':'')+(g.ai?'<button onclick=go(2,1)>Play vs AI</button><br>':'')+'<button onclick=host()>Create lobby</button><br><br><button onclick=menu()>Back</button>')}
 function lob(){const n=conns.length+1;show(`<h2>${g.n}</h2><p>Lobby code</p><h1>${code}</h1><p>Players: ${n}</p>`+(n>=g.min?'<button onclick="go(conns.length+1)">Start</button>':'<p>Waiting for players...</p>')+'<br><button onclick=menu()>Leave</button>');conns.forEach(c=>c.send({l:n}))}
@@ -182,15 +186,15 @@ function host(){const k=g;leave();g=k;code=Array.from({length:4},()=>'ABCDEFGHJK
  p.on('open',lob);
  p.on('connection',c=>{
   c.on('open',()=>{if(started||conns.length>=g.max-1)return c.close();conns.push(c);lob()});
-  c.on('data',m=>S&&g.act(S,conns.indexOf(c)+1,m));
+  c.on('data',m=>m.rm?rem(conns.indexOf(c)+1):S&&g.act(S,conns.indexOf(c)+1,m));
   c.on('close',()=>{if(peer==p&&!started){conns=conns.filter(x=>x!=c);lob()}})})}
 function join(){code=$('cd').value.trim().toUpperCase();leave();const p=peer=new Peer();
  p.on('error',e=>{if(peer!=p)return;alert(e.type=='peer-unavailable'?'Lobby not found':'Network error: '+e.type);menu()});
  p.on('open',()=>{const c=cn=p.connect('cuhub-'+code);
   c.on('open',()=>show(`<h2>Lobby ${code}</h2><p id=n>Connected</p><button onclick=menu()>Leave</button>`));
-  c.on('data',m=>{if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.s){S=m.s;draw()}});
+  c.on('data',m=>{if(m.l&&$('n'))$('n').textContent='Players: '+m.l+' - waiting for host';if(m.g){g=G[m.g];me=m.me;S=null;started=1;begin()}if(m.rq)ask(m.rq);if(m.rs){shown='';PU.hidden=true}if(m.s){S=m.s;draw()}});
   c.on('close',()=>{if(peer==p){alert('Disconnected');menu()}})})}
-function go(n,b){started=1;bot=b;S=g.init(n);me=0;conns.forEach((c,i)=>c.send({g:g.k,me:i+1}));begin()}
+function go(n,b){started=1;bot=b;np=n;S=g.init(n);me=0;conns.forEach((c,i)=>c.send({g:g.k,me:i+1}));begin()}
 function begin(){P.hidden=true;cv.style.display='block';$('clock').hidden=$('aw').hidden=true;if(!cn)iv=setInterval(()=>{if(bot){const a=S.t??S.u;if(g.mv)g.ai(S);else if(a!=1)bt=0;else if((bt+=1/30)>.9){bt=0;g.ai(S)}}g.tick&&g.tick(S,1/30);conns.forEach(c=>c.send({s:S}));draw()},33)}
 
 // input
