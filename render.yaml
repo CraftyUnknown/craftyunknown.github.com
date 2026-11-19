@@ -1,0 +1,10 @@
+# Render Blueprint: New > Blueprint > pick this repo. Deploys the free PeerJS signaling server.
+services:
+  - type: web
+    name: craftyunknown-peer
+    runtime: node
+    plan: free
+    rootDir: peer-server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
