@@ -128,9 +128,15 @@ const PC=[[[0,0],[1,0],[2,0],[3,0]],[[0,0],[1,0],[0,1],[1,1]],[[0,0],[1,0],[2,0]
 const hit=(b,k,x,y)=>k.some(([a,d])=>{const X=x+a,Y=y+d;return X<0||X>9||Y>19||(Y>=0&&b[Y][X])});
 const spawn=q=>{q.k=PC[Math.random()*7|0];q.x=3;q.y=0;q.o=hit(q.b,q.k,3,0)};
 const lock=(s,i)=>{const q=s.p[i];q.k.forEach(([a,d])=>{if(q.y+d>=0)q.b[q.y+d][q.x+a]=1});q.b=q.b.filter(r=>r.includes(0));const n=20-q.b.length;
- while(q.b.length<20)q.b.unshift(Array(10).fill(0));q.sc+=[0,100,300,500,800][n];
+ if(q.hd&&q.hd.a=='D')q.hd=null;while(q.b.length<20)q.b.unshift(Array(10).fill(0));q.sc+=[0,100,300,500,800][n];
  const e=s.p[1-i];if(n>1&&e){e.g+=n-1;lg(s,i,'% sent '+(n-1)+' garbage')}
  for(;q.g>0;q.g--){q.b.shift();const r=Array(10).fill(1);r[Math.random()*10|0]=0;q.b.push(r)}spawn(q)};
+const tmv=(s,p,a)=>{const q=s.p[p];
+  if(a=='L'&&!hit(q.b,q.k,q.x-1,q.y))q.x--;
+  if(a=='R'&&!hit(q.b,q.k,q.x+1,q.y))q.x++;
+  if(a=='U'){const k=q.k.map(([x,y])=>[-y,x]);if(!hit(q.b,k,q.x,q.y))q.k=k}
+  if(a=='D')step(s,p);
+  if(a=='H'){while(!hit(q.b,q.k,q.x,q.y+1))q.y++;lock(s,p)}};
 const step=(s,i)=>{const q=s.p[i];hit(q.b,q.k,q.x,q.y+1)?lock(s,i):q.y++};
 
 // ---- crazy cards ----
@@ -170,14 +176,15 @@ race:{n:'Racing',min:1,max:2,
 tetris:{n:'Tetris',min:1,max:2,
  init:n=>{const s={p:Array.from({length:n},()=>({b:Array.from({length:20},()=>Array(10).fill(0)),t:0,sc:0,g:0,o:0}))};s.p.forEach(spawn);return s},
  act(s,p,m){const q=s.p[p];if(q.o)return;let a;
-  if(m.k&&m.d)a={ArrowLeft:'L',a:'L',ArrowRight:'R',d:'R',ArrowUp:'U',w:'U',ArrowDown:'D',s:'D',' ':'H'}[m.k];
-  else if(m.d===1&&m.x!=null)a=m.x<.3?'L':m.x>.7?'R':m.y>.7?'D':'U';
-  if(a=='L'&&!hit(q.b,q.k,q.x-1,q.y))q.x--;
-  if(a=='R'&&!hit(q.b,q.k,q.x+1,q.y))q.x++;
-  if(a=='U'){const k=q.k.map(([x,y])=>[-y,x]);if(!hit(q.b,k,q.x,q.y))q.k=k}
-  if(a=='D')step(s,p);
-  if(a=='H'){while(!hit(q.b,q.k,q.x,q.y+1))q.y++;lock(s,p)}},
- tick(s,dt){s.p.forEach((q,i)=>{if(q.o)return;q.t+=dt;if(q.t>Math.max(.1,.6-q.sc/4000)){q.t=0;step(s,i)}})},
+  if(m.k){a={ArrowLeft:'L',a:'L',ArrowRight:'R',d:'R',ArrowDown:'D',s:'D',ArrowUp:'U',w:'U',' ':'H'}[m.k];
+   if(a=='L'||a=='R'||a=='D'){if(m.d)q.hd={a,t:0};else if(q.hd&&q.hd.a==a)q.hd=null}
+   if(!m.d)return}
+  else if(m.d===0){q.hd=null;return}
+  else if(m.d===1&&m.x!=null){a=m.x<.3?'L':m.x>.7?'R':m.y>.7?'D':'U';if(a!='U')q.hd={a,t:0}}
+  tmv(s,p,a)},
+ tick(s,dt){s.p.forEach((q,i)=>{if(q.o)return;const h=q.hd;
+   if(h){h.t+=dt;while(h.t>=.17){tmv(s,i,h.a);h.t-=h.a=='D'?.04:.05}}
+   q.t+=dt;if(q.t>Math.max(.1,.6-q.sc/4000)){q.t=0;step(s,i)}})},
  draw(s,me){s.p.forEach((q,i)=>{const ox=s.p.length<2?160:15+i*290;R(ox-2,18,284,564,'#444');R(ox,20,280,560,'#111');
   q.b.forEach((r,y)=>r.forEach((v,x)=>v&&R(ox+x*28+1,20+y*28+1,26,26,'#999')));
   if(!q.o)q.k.forEach(([a,d])=>R(ox+(q.x+a)*28+1,20+(q.y+d)*28+1,26,26,'#fff'));
@@ -200,7 +207,7 @@ chess:{n:'Chess',min:2,max:2,tie:1,
  draw(s,me){const sel=s.s>=0?lm(s.b,s.s):[],P=i=>{let x=i%8,y=i>>3;if(me){x=7-x;y=7-y}return[20+x*70,20+y*70]},
   pc=(q,px,py)=>{const w=q<'a',ch='♟♞♝♜♛♚'['pnbrqk'.indexOf(q.toLowerCase())]+'︎';c.font='56px sans-serif';c.textAlign='center';c.textBaseline='middle';c.lineWidth=2;c.strokeStyle=w?'#000':'#fff';c.fillStyle=w?'#fff':'#000';c.strokeText(ch,px+35,py+38);c.fillText(ch,px+35,py+38)},
   t=s.l?1-ez(ap('m'+s.mn)/220):0,mi=t>0?s.l[1]:-1;
-  for(let i=0;i<64;i++){const[px,py]=P(i),q=s.b[i];R(px,py,70,70,(i%8+(i>>3))%2?'#777':'#ccc');if(s.l&&s.lp!=me&&s.l.includes(i))R(px,py,70,70,'#b96');if(i==s.s)R(px,py,70,70,'#9a6');
+  for(let i=0;i<64;i++){const[px,py]=P(i),q=s.b[i];R(px,py,70,70,(i%8+(i>>3))%2?'#777':'#ccc');if(s.l&&s.lp!=me&&s.l.includes(i))R(px,py,70,70,i==s.l[0]?'#b8e6a0':'#b96');if(i==s.s)R(px,py,70,70,'#9a6');
    if(q&&i!=mi)pc(q,px,py);if(sel.includes(i))O(px+35,py+35,9,'#6a4')}
   if(mi>=0){const[px,py]=P(mi),[fx,fy]=P(s.l[0]);pc(s.b[mi],px+(fx-px)*t,py+(fy-py)*t)}
   T(msg(s,me)+(me?' (black)':' (white)'),300,590,20)}},
@@ -599,5 +606,6 @@ function loop(){iv=setInterval(()=>{if(bot){const a=S.u??S.t;if(g.mv)g.ai(S);els
 
 // input
 onkeydown=onkeyup=e=>{if(e.target.matches&&e.target.matches('input,textarea'))return;if(!S||cv.style.display!='block'||e.repeat)return;if(e.key=='Escape'){e.type=='keydown'&&pause();return}send({k:e.key.replace(/^.$/,x=>x.toLowerCase()),d:+(e.type=='keydown')});if(e.key[0]=='A'||e.key==' ')e.preventDefault()};
+onblur=()=>{if(S&&cv.style.display=='block')['ArrowLeft','ArrowRight','ArrowDown','ArrowUp','a','d','s','w'].forEach(k=>send({k,d:0}))};
 cv.onpointerdown=cv.onpointermove=cv.onpointerup=e=>{if(!S||(e.type=='pointermove'&&!g.mv))return;if(e.type=='pointerdown'&&g.pr){const q=g.pr(S,me);if(q){const v=prompt(q);if(v)send({tx:v});return}}const r=cv.getBoundingClientRect();send({x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,d:e.type=='pointerdown'?1:e.type=='pointerup'?0:2})};
 </script></body></html>
