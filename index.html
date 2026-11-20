@@ -69,6 +69,7 @@ const ez=t=>1-(1-Math.min(1,Math.max(0,t)))**3;
 const tw=(k,x,y,x0=x,y0=y)=>{const o=TW[k]||(TW[k]={x:x0,y:y0}),f=1-Math.exp(-DT*14);o.x+=(x-o.x)*f;o.y+=(y-o.y)*f;return o};
 const sc=(x,y,sx,sy,f)=>{c.save();c.translate(x,y);c.scale(sx,sy);f();c.restore()};
 const ck=(x,y)=>({d:1,x:x/600,y:y/600});
+const wline=(b,W,H,n)=>{for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=b[y*W+x];if(!v)continue;for(const[dx,dy]of[[1,0],[0,1],[1,1],[1,-1]]){let k=1;while(x+dx*k>=0&&x+dx*k<W&&y+dy*k>=0&&y+dy*k<H&&b[(y+dy*k)*W+x+dx*k]==v)k++;if(k>=n)return[x,y,x+dx*(k-1),y+dy*(k-1)]}}return 0};
 const lg=(s,p,t)=>{s.ln=(s.ln||0)+1;(s.lg=s.lg||[]).push([s.ln,p,t]);if(s.lg.length>30)s.lg.shift()};
 const msg=(s,me)=>s.w==null?(s.t==me?'Your turn':"Opponent's turn"):'Game over';
 const win=(b,W,H,n)=>{for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=b[y*W+x];if(!v)continue;for(const[dx,dy]of[[1,0],[0,1],[1,1],[1,-1]]){let k=1;while(k<n&&x+dx*k>=0&&x+dx*k<W&&y+dy*k>=0&&y+dy*k<H&&b[(y+dy*k)*W+x+dx*k]==v)k++;if(k==n)return v}}return 0};
@@ -238,14 +239,15 @@ cards:{n:'Crazy Cards',min:2,max:4,
   else T(s.u==me?'Your turn':'',300,290,20);
   const h=s.h[me],[st,x0]=hx(h.length),cn2={};h.forEach((q,i)=>{const o=cn2[q]=(cn2[q]??-1)+1,p=tw('h'+q+o,x0+i*st,s.u==me&&s.w==null&&ok(s,q)?415:430,200,182);card(p.x,p.y,q,70)});let wy=80;s.h.forEach((h,i)=>{if(i!=me&&h.length>0&&h.length<4&&s.w==null&&chg('oc'+i,[h.length])[0].t<5000){const n=h.length;T((n==1?'UNO! ':'')+(s.h.length>2?'P'+(i+1):'Opponent')+' has '+n+' card'+(n>1?'s':'')+' left!',300,wy,n==1?38:32,['','#e44','#fb3','#ddd'][n]);wy+=38}})}},
 
-c4:{n:'Connect 4',min:2,max:2,tie:1,
+c4:{n:'Connect 4',min:2,max:2,tie:1,dl:1400,
  init:()=>({b:Array(42).fill(0),t:0,w:null}),
  act(s,p,m){if(m.d!==1||m.x==null||p!=s.t||s.w!=null)return;const x=Math.floor((m.x*600-20)/80);if(x<0||x>6)return;
   for(let y=5;y>=0;y--)if(!s.b[y*7+x]){s.b[y*7+x]=p+1;const v=win(s.b,7,6,4);s.w=v?v-1:s.b.includes(0)?null:2;s.t=1-p;return}},
  ai(s){if(s.t!=1||s.w!=null)return;const d=(x,v)=>{for(let y=5;y>=0;y--)if(!s.b[y*7+x]){const n=[...s.b];n[y*7+x]=v;return n}},cs=[0,1,2,3,4,5,6].filter(x=>!s.b[x]);
   const m=cs.find(x=>win(d(x,2),7,6,4))??cs.find(x=>win(d(x,1),7,6,4))??cs.map(x=>[Math.abs(x-3)+Math.random()*2,x]).sort((a,b)=>a[0]-b[0])[0][1];
   this.act(s,1,ck(60+m*80,300))},
- draw(s,me){R(20,70,560,480,'#444');{const A=chg('c4',s.b);s.b.forEach((v,i)=>O(60+i%7*80,110+(i/7|0)*80,32,v&&A[i].t<450&&!A[i].o?'#111':['#111','#fff','#e44'][v]));s.b.forEach((v,i)=>{const t=A[i].t/450;if(v&&t<1&&!A[i].o)O(60+i%7*80,30+(110+(i/7|0)*80-30)*t*t,32,['','#fff','#e44'][v])})}T(msg(s,me)+(me?' (red)':' (white)'),300,35,22)}},
+ draw(s,me){R(20,70,560,480,'#444');{const A=chg('c4',s.b);s.b.forEach((v,i)=>O(60+i%7*80,110+(i/7|0)*80,32,v&&A[i].t<450&&!A[i].o?'#111':['#111','#fff','#e44'][v]));s.b.forEach((v,i)=>{const t=A[i].t/450;if(v&&t<1&&!A[i].o)O(60+i%7*80,30+(110+(i/7|0)*80-30)*t*t,32,['','#fff','#e44'][v])})}if(s.w!=null&&s.w<2){const L=wline(s.b,7,6,4);if(L){const t=ez((ap('wl')-500)/450),x1=60+L[0]*80,y1=110+L[1]*80,x2=60+L[2]*80,y2=110+L[3]*80;c.strokeStyle='#fd4';c.lineWidth=10;c.lineCap='round';c.beginPath();c.moveTo(x1,y1);c.lineTo(x1+(x2-x1)*t,y1+(y2-y1)*t);c.stroke();c.lineCap='butt'}}
+  T(msg(s,me)+(me?' (red)':' (white)'),300,35,22)}},
 
 ttt:{n:'Tic-tac-toe',min:2,max:2,tie:1,
  init:()=>({b:Array(9).fill(0),t:0,w:null}),
@@ -486,6 +488,7 @@ const toast=t=>{const d=document.createElement('div');d.textContent=t;$('ts').ap
 const draw=()=>{if(!S)return;R(0,0,600,600,'#111');c.lineWidth=1;g.draw(S,me);
  if((S.ln||0)<seen)seen=0;const n=(S.h||S.p||[]).length;(S.lg||[]).forEach(([k,p,t])=>{if(k>seen){seen=k;toast(t.replace('%',p==me?'You':n>2?'P'+(p+1):'Opponent'))}});
  const t=S.w==null?'':g.res?g.res(S,me):S.w==2&&g.tie?'Draw':S.w==me?'You win!':g.k=='cards'?'P'+(S.w+1)+' wins':'You lose';
+ if(t&&g.dl&&ap('pd')<g.dl)return;
  if(t!=shown){shown=t;if(t)popup(t);if(t.startsWith('You win'))confetti()}};
 function rem(p){want.add(p);if(want.size>=(bot?1:np)){want=new Set;S=g.init(np,bot,S);rst();shown='';PU.hidden=true;conns.forEach(c=>c.send({rs:1}))}else{const l=[...want];ask(l);conns.forEach(c=>c.send({rq:l}))}}
 const rm=()=>cn?cn.send({rm:1}):rem(0);
