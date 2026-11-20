@@ -207,7 +207,7 @@ chess:{n:'Chess',min:2,max:2,tie:1,
  draw(s,me){const sel=s.s>=0?lm(s.b,s.s):[],P=i=>{let x=i%8,y=i>>3;if(me){x=7-x;y=7-y}return[20+x*70,20+y*70]},
   pc=(q,px,py)=>{const w=q<'a',ch='♟♞♝♜♛♚'['pnbrqk'.indexOf(q.toLowerCase())]+'︎';c.font='56px sans-serif';c.textAlign='center';c.textBaseline='middle';c.lineWidth=2;c.strokeStyle=w?'#000':'#fff';c.fillStyle=w?'#fff':'#000';c.strokeText(ch,px+35,py+38);c.fillText(ch,px+35,py+38)},
   t=s.l?1-ez(ap('m'+s.mn)/220):0,mi=t>0?s.l[1]:-1;
-  for(let i=0;i<64;i++){const[px,py]=P(i),q=s.b[i];R(px,py,70,70,(i%8+(i>>3))%2?'#777':'#ccc');if(s.l&&s.lp!=me&&s.l.includes(i))R(px,py,70,70,i==s.l[0]?'#b8e6a0':'#b96');if(i==s.s)R(px,py,70,70,'#9a6');
+  for(let i=0;i<64;i++){const[px,py]=P(i),q=s.b[i];R(px,py,70,70,(i%8+(i>>3))%2?'#777':'#ccc');if(s.l&&s.lp!=me&&s.l.includes(i))R(px,py,70,70,i==s.l[0]?'#b96':'#b8e6a0');if(i==s.s)R(px,py,70,70,'#9a6');
    if(q&&i!=mi)pc(q,px,py);if(sel.includes(i))O(px+35,py+35,9,'#6a4')}
   if(mi>=0){const[px,py]=P(mi),[fx,fy]=P(s.l[0]);pc(s.b[mi],px+(fx-px)*t,py+(fy-py)*t)}
   T(msg(s,me)+(me?' (black)':' (white)'),300,590,20)}},
